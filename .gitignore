@@ -1,0 +1,6 @@
+*.swp
+*.o
+mcexecutable
+
+stats/
+
