@@ -2,6 +2,9 @@
 #define _OPERATIONS_H_
 
 #include <cstring>
+#include <fstream>
+
+using namespace std;
 
 /* **************************************************************************** */
 class Operations {
@@ -20,6 +23,13 @@ class Operations {
 			lowerLine[length] = '\0';
 			for (int i=0; i<length; i++){lowerLine[i] = tolower(line[i]);}
 			return lowerLine;
+		}
+		bool FileExists(string fileName){
+			bool exists;
+			ifstream file(fileName);
+			exists = (file ? true : false);
+			file.close();
+			return exists;
 		}
 /* **************************************************************************** */
 };
