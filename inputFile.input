@@ -1,28 +1,33 @@
-# Input script for running MC-NVT simulations.
+# Input script for running MC simulations.
 
-InitializationSteps 1e2;
-EquilibriumSteps 1e4;
-ProductionSteps 1e5; 
-PrintEvery 1e2;
-#Temperature 84.916; #K
-Temperature 293; #K
+EquilibriumSets 1e2;
+ProductionSets 1e3; 
+StepsPerSet 1e3;
+PrintEveryNSets 1e1;
+Temperature 87.3; #K
+#Temperature 293; #K
 
-#name Ar;
-name Ga;
-	#NumberOfParticles 500;
-	#Density 1; #g/cm^3
-	#MolarMass 39.948; #g/mol
-	#VdWPotential eamga; 
-	#sigma 3.4; #Angstrom
-	#epsilon 119.6; #K
-	#Rcut 17; #Angstrom
+name Ar;
+#name Ga;
 	NumberOfParticles 200;
-	Density 6.103; #g/cm^3
-	MolarMass 69.723; #g/mol
-	VdWPotential eam_ga; 
-	sigma 2.61; #Angstrom
-	epsilon 1852; #K
-	Rcut 8.3; #Angstrom
+	#Density 0.005772370970132566; #g/cm^3
+	Density 1.395408450869877; #g/cm^3
+	MolarMass 39.948; #g/mol
+	VdWPotential lj; 
+	sigma 3.4; #Angstrom
+	epsilon 119.6; #K
+	Rcut 17; #Angstrom
+	ChemicalPotential -1141.4057469589743; #K. At 1 atm.
+	#NumberOfParticles 200;
+	#Density 6.103; #g/cm^3
+	#MolarMass 69.723; #g/mol
+	#VdWPotential eam_ga; 
+	#sigma 2.61; #Angstrom
+	#epsilon 1852; #K
+	#Rcut 8.3; #Angstrom
+
+DisplacementProbability 0.5;
+ExchangeProbability 0.5;
 
 #EoS
 

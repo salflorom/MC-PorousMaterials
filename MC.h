@@ -24,10 +24,11 @@ class MC {
 /* **************************************************************************** */
 		MC(void);
 		void ReadInputFile(string inFileName);
+		void ResetStats(void);
 		void PrintParams(void);
 		void ComputeBoxSize(void);
-		void AssignPossitions(void);
-		void MoveParticle(int index);
+		void InitialConfig(void);
+		void ExchangeParticle(void);
 		void PBC(int index);
 		void RDF(void);
 		void PrintRDF(int step);
@@ -36,9 +37,11 @@ class MC {
 		void CreateEXYZ(int step);
 		void CreateLogFile(int step);
 		void PrintStats(int step);
-		void IncrementObstruction(void){stats.obstruction++;}
-		double SystemEnergy(void);
+		void ComputeWidom(void);
 		void ComputeChemicalPotential(void);
+		void IncrementObstruction(void){stats.obstruction++;}
+		void ResetWidom(void){stats.widomInsertions = stats.widom = 0;}
+		double SystemEnergy(void);
 		double EnergyOfParticle(int index);
 		double LJ_Energy(int i, int j);
 		// For EAM Ga potential //
@@ -50,11 +53,13 @@ class MC {
 		// For EAM Ga potential //
 		double NeighDistance(int i, int j);
 		double Random(void){return (double)rand()/RAND_MAX;} //random in the interval [0,1].
+		double* GetMCMoveProbabilities(void);
 		bool Overlap(int index);
 		int SelectParticle(void);
-		int GetNSteps(void){return int(sim.nSteps);}
-		int GetNInitSteps(void){return int(sim.nInitSteps);}
-		int GetNEquilSteps(void){return int(sim.nEquilSteps);}
+		int MoveParticle(void);
+		int GetNSets(void){return int(sim.nSets);}
+		int GetNEquilSets(void){return int(sim.nEquilSets);}
+		int GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
 		int GetPrintEvery(void){return int(sim.printEvery);}
 		int GetObstruction(void){return stats.obstruction;}
 		int GetObstructed(int index){return part[index].obstructed;}
@@ -64,21 +69,22 @@ class MC {
 /* **************************************************************************** */
 		struct Stats{
 			int acceptance, rejection, obstruction, nDisplacements;
+			int insertion, deletion, nExchanges;
 			int widomInsertions;
-			double binWidth, insertionParam;
+			double binWidth, widom;
 			long int rdfx[NBINS+1], rdfy[NBINS+1], rdfz[NBINS+1];
 		} stats;
 		struct Simulation{
 			string compute[3];
 			double dx, dy, dz;
-			double nSteps, nInitSteps, nEquilSteps, printEvery;
+			double nSets, nEquilSets, nStepsPerSet, printEvery;
+			double displaceProb, exchangeProb;
 			int step;
 			bool PBC[3];
 		} sim;
 		struct Fluid{
 			string name, vdwPot;
-			double temp, dens, molarMass, boxWidth, rcut, sigma, epsilon;
-			double initialE, finalE, mu;
+			double temp, dens, molarMass, boxWidth, rcut, sigma, epsilon, mu;
 			int nParts;
 		} fluid;
 		struct Particle{
