@@ -1,9 +1,9 @@
 # Input script for running MC simulations.
 
-EquilibriumSets 1e2;
+EquilibriumSets 1e1;
 ProductionSets 1e4;
-StepsPerSet 1e2;
-PrintEveryNSets 1e1;
+StepsPerSet 1e4;
+PrintEveryNSets 1e0;
 Temperature 87.3; #K
 #Temperature 293; #K
 ExternalPressure 101302.1424862485; #Pa
@@ -11,8 +11,8 @@ ExternalPressure 101302.1424862485; #Pa
 name Ar;
 #name Ga;
 	NumberOfParticles 200;
-	Density 0.005772370970132566; #g/cm^3
-	#Density 1.395408450869877; #g/cm^3
+	#Density 0.005772370970132566; #g/cm^3
+	Density 1.395408450869877; #g/cm^3
 	MolarMass 39.948; #g/mol
 	VdWPotential lj; #LJ or EAM_Ga
 	sigma 3.4; #Angstrom

@@ -12,7 +12,6 @@ class Operations {
 	public:
 /* **************************************************************************** */
 		Operations(void){}
-
 		string LowerCase(string line){
 			char lowerLine[50];
 			int length;
@@ -26,10 +25,17 @@ class Operations {
 		}
 		bool FileExists(string fileName){
 			bool exists;
+
 			ifstream file(fileName);
 			exists = (file ? true : false);
 			file.close();
 			return exists;
+		}
+		double Pow(double value, int pow){
+			double result=value;
+
+			for (int i=0; i<pow; i++) result *= value;
+			return result;
 		}
 /* **************************************************************************** */
 };

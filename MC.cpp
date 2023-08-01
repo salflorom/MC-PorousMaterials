@@ -28,24 +28,22 @@ MC::MC(void){
 	sim.nEquilSets = sim.nSets = sim.nStepsPerSet = 0;
 	sim.displaceProb = 1.;
 	sim.volumeProb = sim.exchangeProb = 0.;
-	for (i=0; i<=NBINS; i++){
-		stats.rdfx[i] = 0.;
-		stats.rdfy[i] = 0.;
-		stats.rdfz[i] = 0.;
-	}
+	for (i=0; i<=NBINS; i++) stats.rdf[i] = 0.;
 	for (i=0; i<3; i++) {sim.PBC[i] = true;}
 	//for (i=0; i<MAXPART; i++) {part[i].obstructed = 0;}
 	fluid.epsilon = fluid.sigma = fluid.rcut = 0.;
 	fluid.nParts = 0;
 	fluid.dens = fluid.temp = fluid.molarMass = 0.;
-	fluid.name = fluid.vdwPot = "";
+	fluid.name = fluid.vdwPot = sim.geometry = "";
 }
 void MC::ResetStats(void){
 	stats.acceptance = stats.rejection = stats.nDisplacements = 0;
 	stats.acceptanceVol = stats.rejectionVol = 0;
 	stats.insertion = stats.deletion = 0;
-	stats.widomInsertions = stats.widom = 0;
+	stats.widomInsertions = 0;
+	stats.widom = 0.;
 	stats.obstruction = 0;
+	for (int bin=1; bin<=NBINS; bin++) stats.rdf[bin] = 0.;
 }
 void MC::ReadInputFile(string inFileName){
 	string line, command, value;
@@ -71,6 +69,7 @@ void MC::ReadInputFile(string inFileName){
 		else if (command == "temperature") {fluid.temp = stod(value);}
 		else if (command == "externalpressure") {fluid.extPress = stod(value);  // Pa
 		}
+		else if (command == "geometry") {sim.geometry = value;}
 		else if (command == "name") {fluid.name = value;}
 		else if (command == "numberofparticles") {fluid.nParts = stoi(value);}
 		else if (command == "density") {fluid.dens = stod(value);}
@@ -304,30 +303,44 @@ void MC::ResetParticle(int index){
 	part[index].y = Random()*fluid.boxWidth; //AA
 	part[index].z = Random()*fluid.boxWidth; //AA
 }
-void MC::RDF(void){
-	for (int i=1; i<=int(fluid.nParts); i++){
-		stats.rdfx[int(part[i].x/stats.binWidth)+1]++;
-		stats.rdfy[int(part[i].y/stats.binWidth)+1]++;
-		stats.rdfz[int(part[i].z/stats.binWidth)+1]++;
+void MC::ComputeRDF(void){
+	int bin;
+	double deltaR;
+	Operations ops;
 
+	deltaR = fluid.rcut/NBINS;
+	for (int i=1; i<=int(fluid.nParts)-1; i++){
+		for (int j=i+1; j<=int(fluid.nParts); j++){
+			bin = int(NeighDistance(i, j)/deltaR)+1;
+			if (bin <= NBINS) stats.rdf[bin] += 2; // Takes into account both i->j and j->i.
+		}
 	}
 }
+
 // Check PrintRDF!!
 void MC::PrintRDF(int set){
+	double constant, deltaR, lowR, highR, rho, dn_ideal, gofr[NBINS+1];
 	Operations ops;
 	ofstream rdfFile;
 	string outFileName="stats/rdf.dat";
-	double dw=stats.binWidth;
-	double density=fluid.nParts/NBINS;
-	double relativeSet=set+sim.printEvery;
 
+	deltaR = fluid.rcut/NBINS;
+	rho = fluid.nParts/ops.Pow(fluid.boxWidth,3);
+	constant = (4*pi*rho/3);
+	for (int bin=1; bin<=NBINS; bin++){
+		gofr[bin] = stats.rdf[bin]/(1.*fluid.nParts*sim.nStepsPerSet);
+		lowR = bin*deltaR;
+		highR = lowR + deltaR;
+		dn_ideal = constant*(ops.Pow(highR,3)-ops.Pow(lowR,3));
+		gofr[bin] /= dn_ideal;
+	}
+	//Write into the file.
 	if (ops.FileExists(outFileName)) rdfFile.open(outFileName, ios::app);
 	else rdfFile.open(outFileName);
-	rdfFile << NBINS << "\nrx(AA)\tg(rx)\try(AA)\tg(ry)\trz(AA)\tg(rz)" << endl;
-	for (int i=1; i<=NBINS; i++){
-		rdfFile << (i-0.5)*dw << "\t" << stats.rdfx[i]/(relativeSet*density) << "\t";
-		rdfFile << (i-0.5)*dw << "\t" << stats.rdfy[i]/(relativeSet*density) << "\t";
-		rdfFile << (i-0.5)*dw << "\t" << stats.rdfz[i]/(relativeSet*density) << endl;
+	rdfFile << "nBins; set: "<< NBINS << "; " << set << endl;
+	rdfFile << "r(AA)\tg(r)" << endl;
+	for (int bin=1; bin<=NBINS; bin++){
+		rdfFile << (bin+0.5)*deltaR << "\t" << gofr[bin] << endl;
 	}
 	rdfFile.close();
 }
@@ -405,10 +418,10 @@ double MC::NeighDistance(int i, int j){
 	double boxWidth=fluid.boxWidth;
 
 	dx = part[j].x - part[i].x; //AA
-	dx -= round(dx/boxWidth) * boxWidth; //AA
 	dy = part[j].y - part[i].y; //AA.
-	dy -= round(dy/boxWidth) * boxWidth; //AA
 	dz = part[j].z - part[i].z; //AA.
+	dx -= round(dx/boxWidth) * boxWidth; //AA
+	dy -= round(dy/boxWidth) * boxWidth; //AA
 	dz -= round(dz/boxWidth) * boxWidth; //AA
 	dist = sqrt(dx*dx + dy*dy + dz*dz); //AA
 	return dist; //AA

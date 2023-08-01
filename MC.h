@@ -32,8 +32,8 @@ class MC {
 		void ChangeVolume(void);
 		void ExchangeParticle(void);
 		void PBC(int index);
-		void RDF(void);
-		void PrintRDF(int step);
+		void ComputeRDF(void);
+		void PrintRDF(int set);
 		void Metropolis(int index);
 		void ResetParticle(int index);
 		void CreateEXYZ(int step);
@@ -70,11 +70,10 @@ class MC {
 			int acceptanceVol, rejectionVol, nVolChanges;
 			int insertion, deletion, nExchanges;
 			int widomInsertions;
-			double binWidth, widom;
-			long int rdfx[NBINS+1], rdfy[NBINS+1], rdfz[NBINS+1];
+			double binWidth, widom, rdf[NBINS+1];
 		} stats;
 		struct Simulation{
-			string compute[3];
+			string compute[3], geometry;
 			double dx, dy, dz, dv;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
 			double displaceProb, exchangeProb, volumeProb;
