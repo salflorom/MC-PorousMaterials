@@ -16,8 +16,7 @@
 int main(int argc, char** argv){
 	srand((unsigned)time(NULL)); //seed
 	string inFileName;
-	int particle, nSets, nEquilSets, nStepsPerSet, printEvery, obstructed;
-	int obstructionLimit=10;
+	int nSets, nEquilSets, nStepsPerSet, printEvery;
 	double* moveProbs;
 	double rand;
 	MC mc;
@@ -37,27 +36,14 @@ int main(int argc, char** argv){
 	for (int set=1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
-		mc.ResetWidom();
-		if (set >= nEquilSets) obstructionLimit = INT_MAX;
 		for (int step=1; step<=nStepsPerSet; step++){
 			rand = mc.Random();
-			if (rand <= moveProbs[0]){ //Try displacement.
-				particle = mc.MoveParticle();
-				//obstructed = mc.GetObstructed(particle);
-				//if (obstructed >= obstructionLimit){
-					//mc.ResetParticle(particle);
-					//mc.IncrementObstruction();
-				//}
-			}else if (rand <= moveProbs[1]){ //Try exchange.
-				mc.ExchangeParticle();
-			}
-			if (set >= nEquilSets){
-				if (moveProbs[0] == 1) mc.ComputeWidom(); //If NVT ensemble...
-			}
+			if (rand <= moveProbs[0]) mc.MoveParticle(); //Try displacement.
+			else if (rand <= moveProbs[1]) mc.ChangeVolume(); //Try volume change.
+			else if (rand <= moveProbs[2]) mc.ExchangeParticle(); //Try exchange.
+			if (set >= nEquilSets) mc.ComputeWidom();
 		}
-		if (set >= nEquilSets){
-			if (moveProbs[0] == 1) mc.ComputeChemicalPotential(); //If NVT ensemble...
-		}
+		if (set >= nEquilSets) mc.ComputeChemicalPotential();
 		if (set%printEvery == 0){
 			mc.PrintStats(set);
 			mc.CreateEXYZ(set);

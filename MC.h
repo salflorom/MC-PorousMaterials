@@ -11,7 +11,7 @@
 #define NBINS 100
 #define MAXPART 99999 //Max. num. of particles.
 #define pi M_PI
-#define kb 1.38062e-23 // J/K
+#define kb 1.380649e-23 // J/K
 #define na 6.02214e23 // mol^-1
 #define plank 1.054571817e-34 // J*s
 
@@ -28,6 +28,8 @@ class MC {
 		void PrintParams(void);
 		void ComputeBoxSize(void);
 		void InitialConfig(void);
+		void MoveParticle(void);
+		void ChangeVolume(void);
 		void ExchangeParticle(void);
 		void PBC(int index);
 		void RDF(void);
@@ -40,23 +42,19 @@ class MC {
 		void ComputeWidom(void);
 		void ComputeChemicalPotential(void);
 		void IncrementObstruction(void){stats.obstruction++;}
-		void ResetWidom(void){stats.widomInsertions = stats.widom = 0;}
 		double SystemEnergy(void);
 		double EnergyOfParticle(int index);
 		double LJ_Energy(int i, int j);
-		// For EAM Ga potential //
+		// For EAM Ga potential vvvvv //
 		double EAMGA_Energy(int index);
 		double StepUnit(double radius, double leftLim, double rightLim);
 		double EmbPot(double rho);
 		double eDens(double radius);
 		double PairPot(double radius);
-		// For EAM Ga potential //
+		// For EAM Ga potential ^^^^^ //
 		double NeighDistance(int i, int j);
 		double Random(void){return (double)rand()/RAND_MAX;} //random in the interval [0,1].
 		double* GetMCMoveProbabilities(void);
-		bool Overlap(int index);
-		int SelectParticle(void);
-		int MoveParticle(void);
 		int GetNSets(void){return int(sim.nSets);}
 		int GetNEquilSets(void){return int(sim.nEquilSets);}
 		int GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
@@ -69,6 +67,7 @@ class MC {
 /* **************************************************************************** */
 		struct Stats{
 			int acceptance, rejection, obstruction, nDisplacements;
+			int acceptanceVol, rejectionVol, nVolChanges;
 			int insertion, deletion, nExchanges;
 			int widomInsertions;
 			double binWidth, widom;
@@ -76,15 +75,17 @@ class MC {
 		} stats;
 		struct Simulation{
 			string compute[3];
-			double dx, dy, dz;
+			double dx, dy, dz, dv;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
-			double displaceProb, exchangeProb;
+			double displaceProb, exchangeProb, volumeProb;
 			int step;
 			bool PBC[3];
 		} sim;
 		struct Fluid{
 			string name, vdwPot;
-			double temp, dens, molarMass, boxWidth, rcut, sigma, epsilon, mu;
+			double temp, dens, molarMass, extPress, boxWidth, mu;
+			double rcut, sigma, epsilon;
+			double systemEnergy;
 			int nParts;
 		} fluid;
 		struct Particle{

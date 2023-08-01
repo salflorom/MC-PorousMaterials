@@ -16,29 +16,36 @@ using namespace std;
 
 MC::MC(void){
 	int i;
-	stats.acceptance = stats.rejection = stats.obstruction = 0;
+	stats.acceptance = stats.rejection = stats.nDisplacements = 0;
+	stats.acceptanceVol = stats.rejectionVol = stats.nVolChanges = 0;
 	stats.insertion = stats.deletion = stats.nExchanges = 0;
-	stats.nDisplacements = stats.widomInsertions = stats.widom = 0;
-	fluid.mu = 0;
-	sim.dx = 1, sim.dy = 1, sim.dz = 1;
+	stats.obstruction = 0;
+	stats.widomInsertions = 0;
+	stats.widom = 0.;
+	fluid.mu = 0.;
+	fluid.extPress = 0.;
+	sim.dx = 1., sim.dy = 1., sim.dz = 1., sim.dv = 1.;
 	sim.nEquilSets = sim.nSets = sim.nStepsPerSet = 0;
-	sim.displaceProb = 1;
-	sim.exchangeProb = 0;
+	sim.displaceProb = 1.;
+	sim.volumeProb = sim.exchangeProb = 0.;
 	for (i=0; i<=NBINS; i++){
-		stats.rdfx[i] = 0;
-		stats.rdfy[i] = 0;
-		stats.rdfz[i] = 0;
+		stats.rdfx[i] = 0.;
+		stats.rdfy[i] = 0.;
+		stats.rdfz[i] = 0.;
 	}
 	for (i=0; i<3; i++) {sim.PBC[i] = true;}
-	for (i=0; i<MAXPART; i++) {part[i].obstructed = 0;}
-	fluid.epsilon = fluid.sigma = fluid.rcut = 0;
-	fluid.nParts = fluid.dens = fluid.temp = fluid.molarMass = 0;
+	//for (i=0; i<MAXPART; i++) {part[i].obstructed = 0;}
+	fluid.epsilon = fluid.sigma = fluid.rcut = 0.;
+	fluid.nParts = 0;
+	fluid.dens = fluid.temp = fluid.molarMass = 0.;
 	fluid.name = fluid.vdwPot = "";
 }
 void MC::ResetStats(void){
-	stats.acceptance = stats.rejection = 0;
-	stats.obstruction = stats.insertion = 0;
-	stats.deletion = stats.nDisplacements = 0;
+	stats.acceptance = stats.rejection = stats.nDisplacements = 0;
+	stats.acceptanceVol = stats.rejectionVol = 0;
+	stats.insertion = stats.deletion = 0;
+	stats.widomInsertions = stats.widom = 0;
+	stats.obstruction = 0;
 }
 void MC::ReadInputFile(string inFileName){
 	string line, command, value;
@@ -57,14 +64,15 @@ void MC::ReadInputFile(string inFileName){
 			command = ops.LowerCase(params[1]);
 			value = ops.LowerCase(params[2]);
 		}
-		//cout << command << " " << value << endl;
 		if (command == "productionsets") {sim.nSets = stod(value);}
 		else if (command == "equilibriumsets") {sim.nEquilSets = stod(value);}
 		else if (command == "stepsperset") {sim.nStepsPerSet = stod(value);}
 		else if (command == "printeverynsets") {sim.printEvery = stod(value);}
 		else if (command == "temperature") {fluid.temp = stod(value);}
+		else if (command == "externalpressure") {fluid.extPress = stod(value);  // Pa
+		}
 		else if (command == "name") {fluid.name = value;}
-		else if (command == "numberofparticles") {fluid.nParts = stod(value);}
+		else if (command == "numberofparticles") {fluid.nParts = stoi(value);}
 		else if (command == "density") {fluid.dens = stod(value);}
 		else if (command == "molarmass") {fluid.molarMass = stod(value);}
 		else if (command == "vdwpotential") {fluid.vdwPot = value;}
@@ -73,6 +81,7 @@ void MC::ReadInputFile(string inFileName){
 		else if (command == "rcut") {fluid.rcut = stod(value);}
 		else if (command == "chemicalpotential") {fluid.mu = stod(value);}
 		else if (command == "displacementprobability") {sim.displaceProb = stod(value);}
+		else if (command == "changevolumeprobability") {sim.volumeProb = stod(value);}
 		else if (command == "exchangeprobability") {sim.exchangeProb = stod(value);}
 
 	}
@@ -88,16 +97,17 @@ void MC::ComputeBoxSize(void){
 	fluid.boxWidth = boxWidth;
 	stats.binWidth = fluid.rcut/NBINS;
 	sim.dx = sim.dy = sim.dz = fluid.sigma; //AA. Step size set to sigma.
+	sim.dv = fluid.sigma*fluid.sigma*fluid.sigma; //AA^3. Volume step size set to sigma^3.
 }
 double* MC::GetMCMoveProbabilities(void){
-	static double cumulativeMoveProbs[2]={0, 0};
+	static double cumulativeMoveProbs[3]; //Size equals num. of MC moves.
+	double totalProb;
 
+	totalProb = sim.displaceProb + sim.exchangeProb + sim.volumeProb;
 	cumulativeMoveProbs[0] = sim.displaceProb;
-	cumulativeMoveProbs[1] = cumulativeMoveProbs[0] + sim.exchangeProb;
-	if (cumulativeMoveProbs[1] > 1){
-		cout << "Sum of MC move probabilities must equal 1." << endl;
-		exit(EXIT_FAILURE);
-	}
+	cumulativeMoveProbs[1] = cumulativeMoveProbs[0] + sim.volumeProb;
+	cumulativeMoveProbs[2] = cumulativeMoveProbs[1] + sim.exchangeProb;
+	for (int i=0; i<3; i++) cumulativeMoveProbs[i] /= totalProb; //Normalized cumulative prob.
 	return cumulativeMoveProbs;
 }
 void MC::PrintParams(void){
@@ -106,6 +116,8 @@ void MC::PrintParams(void){
 	cout << "Steps per set: " << sim.nStepsPerSet << endl;
 	cout << "Print every n sets: " << 	sim.printEvery << endl;
 	cout << "Temperature (K): " << fluid.temp << endl;
+	if (sim.volumeProb > 0) cout << "External pressure (Pa): " << fluid.extPress << endl;
+	if (sim.exchangeProb > 0) cout << "mu (K): " << fluid.mu << endl;
 	cout << "Fluid name: " << fluid.name << endl;
 	cout << "Molar mass (g/mol): " << fluid.molarMass << endl;
 	cout << "VdW potential: " << fluid.vdwPot << endl;
@@ -114,10 +126,10 @@ void MC::PrintParams(void){
 	cout << "rcut (AA): " << fluid.rcut << endl;
 	cout << "Number of particles: " << fluid.nParts << endl;
 	cout << "Density (g/cm^3): " << fluid.dens << endl;
-	cout << "Box width (AA): " << fluid.boxWidth << endl;
+	cout << "Initial box width (AA): " << fluid.boxWidth << endl;
 	cout << "Displacement probability: " << sim.displaceProb << endl;
+	cout << "Change volume probability: " << sim.volumeProb << endl;
 	cout << "Exchange probability: " << sim.exchangeProb << endl;
-	if (sim.exchangeProb > 0) cout << "mu (K): " << fluid.mu << endl;
 	cout << endl;
 }
 void MC::InitialConfig(void){
@@ -127,7 +139,7 @@ void MC::InitialConfig(void){
 		part[i].z = Random()*fluid.boxWidth;
 	}
 }
-int MC::MoveParticle(void){
+void MC::MoveParticle(void){
 	int index;
 	double initialEnergy, finalEnergy, argument;
 
@@ -154,7 +166,6 @@ int MC::MoveParticle(void){
 		part[index].obstructed++;
 		stats.rejection++;
 	}
-	return index;
 }
 // PBC for a box with the origin at the lower left vertex.
 void MC::PBC(int index){
@@ -162,8 +173,44 @@ void MC::PBC(int index){
 	part[index].y -= floor(part[index].y/fluid.boxWidth) * fluid.boxWidth; //AA
 	part[index].z -= floor(part[index].z/fluid.boxWidth) * fluid.boxWidth; //AA
 }
+void MC::ChangeVolume(void){
+	double initEnergy, finalEnergy, deltaEnergy;
+	double initVol, finalVol, logFinalVol, deltaVol;
+	double initBoxWidth, finalBoxWidth;
+	double argument;
+	double extPress;
+
+	stats.nVolChanges++;
+	extPress = fluid.extPress/kb*1e-30; // K/AA^3
+	initEnergy = SystemEnergy();
+	initBoxWidth = fluid.boxWidth;
+	initVol = fluid.boxWidth*fluid.boxWidth*fluid.boxWidth;
+	logFinalVol = log(initVol) + (Random()-0.5)*sim.dv; //Perform volume change step.
+	finalVol = exp(logFinalVol);
+	deltaVol = finalVol-initVol;
+	finalBoxWidth = cbrt(finalVol);
+	for (int i=1; i<=fluid.nParts; i++){ //Rescale center of mass.
+		part[i].x *= finalBoxWidth/initBoxWidth;
+		part[i].y *= finalBoxWidth/initBoxWidth;
+		part[i].z *= finalBoxWidth/initBoxWidth;
+	}
+	fluid.boxWidth = finalBoxWidth;
+	finalEnergy = SystemEnergy();
+	deltaEnergy = finalEnergy-initEnergy;
+	argument = -(deltaEnergy + extPress*deltaVol - (fluid.nParts+1)*log(finalVol/initVol)*fluid.temp)/fluid.temp;
+	if ((Random() > exp(argument)) || (finalBoxWidth < 2*fluid.rcut)){ //Rejected change-volume trial.
+		for (int i=1; i<=fluid.nParts; i++){ //Rescale center of mass to initial.
+			part[i].x *= initBoxWidth/finalBoxWidth;
+			part[i].y *= initBoxWidth/finalBoxWidth;
+			part[i].z *= initBoxWidth/finalBoxWidth;
+		}
+		fluid.boxWidth = initBoxWidth;
+		stats.rejectionVol++;
+	}else stats.acceptanceVol++;
+}
 void MC::ExchangeParticle(void){
 	double partMass, thermalWL, zz, energy, argument, volume;
+	double randNum;
 	int index;
 
 	partMass = fluid.molarMass/na*1e3; // kg/particle
@@ -171,29 +218,28 @@ void MC::ExchangeParticle(void){
 	thermalWL = plank/sqrt(2*pi*partMass*kb*fluid.temp); // m^3
 	zz=exp(fluid.mu/fluid.temp)/(thermalWL*thermalWL*thermalWL); // m^-3
 	volume = fluid.boxWidth*fluid.boxWidth*fluid.boxWidth*1e-30; //m^3
-	if ((Random() < 0.5 ) && (fluid.nParts > 0)){ // Try removing particle.
+	randNum = Random();
+	if ((randNum < 0.5 ) && (fluid.nParts > 0)){ // Try removing particle.
 		// Select particle.
 		do{
 			index = int(Random()*fluid.nParts)+1;
 		}while (index > fluid.nParts);
 		energy = EnergyOfParticle(index); //K
-		// Motropolis (for removing particle).
-		argument = fluid.nParts*exp(energy/fluid.temp)/(zz*volume);
+		argument = fluid.nParts*exp(energy/fluid.temp)/(zz*volume); // Motropolis (for removing particle).
 		if (Random() < argument){ // Accepted: Remove particle.
 			part[index] = part[fluid.nParts];
 			fluid.nParts--;
 			stats.insertion++;
 			stats.nExchanges++;
 		}
-	}else if (fluid.nParts > 0){ // Try inserting particle.
+	}else if (randNum > 0.5){ // Try inserting particle.
 		// Insert particle at random position.
 		index = fluid.nParts+1;
 		part[index].x = Random()*fluid.boxWidth; //AA
 		part[index].y = Random()*fluid.boxWidth; //AA
 		part[index].z = Random()*fluid.boxWidth; //AA
 		energy = EnergyOfParticle(index); //K
-		// Metropolis (for inserting particle).
-		argument = zz*volume*exp(-energy/fluid.temp)/(fluid.nParts+1);
+		argument = zz*volume*exp(-energy/fluid.temp)/(fluid.nParts+1); // Metropolis (for inserting particle).
 		if (Random() < argument){
 			fluid.nParts++; // Accepted: Insert particle.
 			stats.deletion++;
@@ -220,23 +266,38 @@ double MC::SystemEnergy(void){
 	return energy;
 }
 void MC::ComputeWidom(void){
-	// Insert virtual particle.
-	part[MAXPART-1].x = Random()*fluid.boxWidth;
-	part[MAXPART-1].y = Random()*fluid.boxWidth;
-	part[MAXPART-1].z = Random()*fluid.boxWidth;
-	stats.widomInsertions++;
-	stats.widom += exp(-EnergyOfParticle(MAXPART-1)/fluid.temp);
+	double volume;
+	if (sim.exchangeProb == 0){
+		// Insert virtual particle.
+		part[MAXPART-1].x = Random()*fluid.boxWidth;
+		part[MAXPART-1].y = Random()*fluid.boxWidth;
+		part[MAXPART-1].z = Random()*fluid.boxWidth;
+		stats.widomInsertions++;
+		if (sim.volumeProb > 0){
+			volume = fluid.boxWidth*fluid.boxWidth*fluid.boxWidth;
+			stats.widom += volume*exp(-EnergyOfParticle(MAXPART-1)/fluid.temp);
+		}else stats.widom += exp(-EnergyOfParticle(MAXPART-1)/fluid.temp);
+	}
 }
 void MC::ComputeChemicalPotential(void){
 	double thermalWL, partMass, volume, muIdeal, muExcess, insertionParam;
+	double extPress;
 
-	partMass = fluid.molarMass/na*1e-3; // kg/particle
-	thermalWL = plank/sqrt(2*pi*partMass*kb*fluid.temp); //m^3
-	volume = fluid.boxWidth*fluid.boxWidth*fluid.boxWidth*1e-30; //m^3
-	muIdeal = fluid.temp*log(thermalWL*thermalWL*thermalWL*(fluid.nParts+1)/volume); //K
-	insertionParam = stats.widom/stats.widomInsertions;
-	muExcess = -fluid.temp*log(insertionParam); //K
-	fluid.mu = muIdeal+muExcess; //K
+	if (sim.exchangeProb == 0){
+		partMass = fluid.molarMass/na*1e-3; // kg/particle
+		thermalWL = plank/sqrt(2*pi*partMass*kb*fluid.temp)*1e10; //AA
+		volume = fluid.boxWidth*fluid.boxWidth*fluid.boxWidth; //AA^3
+		insertionParam = stats.widom/stats.widomInsertions;
+		if (sim.volumeProb > 0){
+			extPress = fluid.extPress/kb*1e-30; // K/AA^3
+			muIdeal = fluid.temp*log(thermalWL*thermalWL*thermalWL*extPress/fluid.temp); //K
+			muExcess = -fluid.temp*log(insertionParam*extPress/(fluid.temp*(fluid.nParts+1))); //K
+		}else{
+			muIdeal = fluid.temp*log(thermalWL*thermalWL*thermalWL*(fluid.nParts+1)/volume); //K
+			muExcess = -fluid.temp*log(insertionParam); //K
+		}
+		fluid.mu = muIdeal+muExcess; //K
+	}
 }
 void MC::ResetParticle(int index){
 	part[index].x = Random()*fluid.boxWidth; //AA
@@ -273,19 +334,24 @@ void MC::PrintRDF(int set){
 void MC::PrintStats(int set){
 	cout << "Set: " << set << endl;
 	if (stats.nDisplacements > 0){
-		cout << "AccepRatio; RegectRatio:\t";
+		cout << "AcceptDispRatio; RegectDispRatio:\t";
 		cout << stats.acceptance*1./stats.nDisplacements << "; ";
 		cout << stats.rejection*1./stats.nDisplacements << endl;
+	}
+	if (sim.volumeProb > 0){
+		cout << "AcceptVolRatio; RejectVolRatio:\t";
+		cout << stats.acceptanceVol*1./stats.nVolChanges << "; ";
+		cout << stats.rejectionVol*1./stats.nVolChanges << endl;
+	}
+	if (sim.exchangeProb > 0){
+		cout << "InsertRatio; DeletRatio:\t";
+		cout << stats.insertion*1./(stats.nExchanges+1.) << "; ";
+		cout << stats.deletion*1./(stats.nExchanges+1.) << endl;
 	}
 	if (fluid.nParts > 0){
 		cout << "NumPartcles; Energy/Particle:\t";
 		cout << fluid.nParts << "; ";
 		cout << SystemEnergy()/fluid.nParts << endl;
-	}
-	if ((sim.exchangeProb > 0) && (fluid.nParts > 0)){
-		cout << "InsertRatio; DeletRatio:\t";
-		cout << stats.insertion*1./stats.nExchanges << "; ";
-		cout << stats.deletion*1./stats.nExchanges << endl;
 	}
 	cout << endl;
 }
@@ -312,14 +378,15 @@ void MC::CreateLogFile(int set){
 	Operations ops;
 	ofstream logFile;
 	string outFileName="stats/simulation.log";
-	double energyPerPart, density;
+	double energyPerPart, density, volume;
 
 	density = fluid.nParts/(fluid.boxWidth*fluid.boxWidth*fluid.boxWidth);
 	density *= fluid.molarMass/na*1e24; // g/cm^3
+	volume = fluid.boxWidth*fluid.boxWidth*fluid.boxWidth; //AA
 	if (!ops.FileExists(outFileName)){
 		logFile.open(outFileName);
 		logFile << "Set\tNParts\tDens[g/cm^3]\t";
-		logFile << "BoxWidth[AA]\tE/part [K]\tmu [K]\n";
+		logFile << "BoxWidth[AA]\tVolume[AA^3]\tE/part[K]\tmu[K]\n";
 	}else{
 		energyPerPart = SystemEnergy()/fluid.nParts;
 		logFile.open(outFileName, ios::app);
@@ -327,14 +394,15 @@ void MC::CreateLogFile(int set){
 		logFile << fluid.nParts << "\t";
 		logFile << density << "\t";
 		logFile << fluid.boxWidth << "\t";
+		logFile << volume << "\t";
 		logFile << energyPerPart << "\t";
 		logFile	<< fluid.mu << "\n";
 	}
 	logFile.close();
 }
 double MC::NeighDistance(int i, int j){
-	float dist, dx, dy, dz;
-	float boxWidth=fluid.boxWidth;
+	double dist, dx, dy, dz;
+	double boxWidth=fluid.boxWidth;
 
 	dx = part[j].x - part[i].x; //AA
 	dx -= round(dx/boxWidth) * boxWidth; //AA
