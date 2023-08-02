@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <vector>
+#include <random>
 
 #define NBINS 100
 #define MAXPART 99999 //Max. num. of particles.
@@ -28,6 +29,7 @@ class MC {
 		void PrintParams(void);
 		void ComputeBoxSize(void);
 		void InitialConfig(void);
+		void MinimizeEnergy(void);
 		void MoveParticle(void);
 		void ChangeVolume(void);
 		void ExchangeParticle(void);
@@ -41,7 +43,6 @@ class MC {
 		void PrintStats(int step);
 		void ComputeWidom(void);
 		void ComputeChemicalPotential(void);
-		void IncrementObstruction(void){stats.obstruction++;}
 		double SystemEnergy(void);
 		double EnergyOfParticle(int index);
 		double LJ_Energy(int i, int j);
@@ -53,22 +54,29 @@ class MC {
 		double PairPot(double radius);
 		// For EAM Ga potential ^^^^^ //
 		double NeighDistance(int i, int j);
-		double Random(void){return (double)rand()/RAND_MAX;} //random in the interval [0,1].
+		double Random(void){return dis(engine);} //random num. in the interval [0,1).
 		double* GetMCMoveProbabilities(void);
 		int GetNSets(void){return int(sim.nSets);}
 		int GetNEquilSets(void){return int(sim.nEquilSets);}
 		int GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
 		int GetPrintEvery(void){return int(sim.printEvery);}
-		int GetObstruction(void){return stats.obstruction;}
-		int GetObstructed(int index){return part[index].obstructed;}
 		string* GetCompute(void){return sim.compute;}
 /* **************************************************************************** */
 	protected:
 /* **************************************************************************** */
+   // Use random_device to generate a seed for Mersenne twister engine.
+   random_device rd{};
+   // Use Mersenne twister engine to generate pseudo-random numbers.
+   mt19937_64 engine{rd()};
+   // "Filter" MT engine's output to generate pseudo-random double values,
+   // **uniformly distributed** on the interval [0, 1).
+   uniform_real_distribution<double> dis{0.0,0.9999};
+
 		struct Stats{
-			int acceptance, rejection, obstruction, nDisplacements;
+			int acceptance, rejection, nDisplacements;
 			int acceptanceVol, rejectionVol, nVolChanges;
-			int insertion, deletion, nExchanges;
+			int acceptInsertion, rejectInsertion;
+			int acceptDeletion, rejectDeletion, nExchanges;
 			int widomInsertions;
 			double binWidth, widom, rdf[NBINS+1];
 		} stats;
@@ -89,7 +97,6 @@ class MC {
 		} fluid;
 		struct Particle{
 			double x, y, z;
-			int obstructed;
 		} part[MAXPART];
 /* **************************************************************************** */
 };

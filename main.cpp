@@ -17,6 +17,7 @@ int main(int argc, char** argv){
 	srand((unsigned)time(NULL)); //seed
 	string inFileName;
 	int nSets, nEquilSets, nStepsPerSet, printEvery;
+	int initMoves=200;
 	double* moveProbs;
 	double rand;
 	MC mc;
@@ -33,6 +34,7 @@ int main(int argc, char** argv){
 	nStepsPerSet = mc.GetNStepsPerSet();
 	printEvery = mc.GetPrintEvery();
 	moveProbs = mc.GetMCMoveProbabilities();
+	mc.MinimizeEnergy();
 	for (int set=1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
@@ -43,12 +45,12 @@ int main(int argc, char** argv){
 			else if (rand <= moveProbs[2]) mc.ExchangeParticle(); //Try exchange.
 			if (set >= nEquilSets){
 				mc.ComputeWidom();
-				if (moveProbs[0] == 1) mc.ComputeRDF(); //Only for NVT simulations.
+				//if (moveProbs[0] == 1) mc.ComputeRDF(); //Only for NVT simulations.
 			}
 		}
 		if ((set%printEvery == 0) && (set >= nEquilSets)){
 			mc.ComputeChemicalPotential();
-			if (moveProbs[0] == 1) mc.PrintRDF(set); //Only for NVT simulations.
+			//if (moveProbs[0] == 1) mc.PrintRDF(set); //Only for NVT simulations.
 			mc.PrintStats(set);
 			mc.CreateEXYZ(set);
 			mc.CreateLogFile(set);

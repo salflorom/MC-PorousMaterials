@@ -1,6 +1,6 @@
 # Input script for running MC simulations.
 
-EquilibriumSets 1e1;
+EquilibriumSets 0e1;
 ProductionSets 1e4;
 StepsPerSet 1e4;
 PrintEveryNSets 1e0;
@@ -18,7 +18,8 @@ name Ar;
 	sigma 3.4; #Angstrom
 	epsilon 119.6; #K
 	Rcut 17; #Angstrom
-	#ChemicalPotential -1141.3739364084965; #K. At 1 atm.
+	#ChemicalPotential -1141.3790680287825; #K. At 1 atm.
+	ChemicalPotential -1141.3790680288487; #K. At 1 atm.
 
 	#NumberOfParticles 200;
 	#Density 6.103; #g/cm^3
@@ -29,7 +30,7 @@ name Ar;
 	#Rcut 8.3; #Angstrom
 
 DisplacementProbability 0.5;
-#ChangeVolumeProbability 0.5;
+ChangeVolumeProbability 0.5;
 #ExchangeProbability 0.5;
 
 #EoS
