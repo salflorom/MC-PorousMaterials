@@ -27,24 +27,26 @@ class MC {
 		void ReadInputFile(string inFileName);
 		void ResetStats(void);
 		void PrintParams(void);
-		void ComputeBoxSize(void);
+		void InsertParticle(int);
 		void InitialConfig(void);
 		void MinimizeEnergy(void);
 		void MoveParticle(void);
 		void ChangeVolume(void);
+		void RescaleCenterOfMass(double initBoxWidth, double finalBoxWidth, bool rescale);
 		void ExchangeParticle(void);
 		void PBC(int index);
 		void ComputeRDF(void);
 		void PrintRDF(int set);
 		void Metropolis(int index);
-		void ResetParticle(int index);
 		void CreateEXYZ(int step);
 		void CreateLogFile(int step);
 		void PrintStats(int step);
 		void ComputeWidom(void);
 		void ComputeChemicalPotential(void);
-		double SystemEnergy(void);
-		double EnergyOfParticle(int index);
+		void EnergyOfParticle(int index);
+		double ComputeVolume(void);
+		double ComputeBoxWidth(double volume);
+		double* SystemEnergy(void);
 		double LJ_Energy(int i, int j);
 		// For EAM Ga potential vvvvv //
 		double EAMGA_Energy(int index);
@@ -64,13 +66,13 @@ class MC {
 /* **************************************************************************** */
 	protected:
 /* **************************************************************************** */
-   // Use random_device to generate a seed for Mersenne twister engine.
-   random_device rd{};
-   // Use Mersenne twister engine to generate pseudo-random numbers.
-   mt19937_64 engine{rd()};
-   // "Filter" MT engine's output to generate pseudo-random double values,
-   // **uniformly distributed** on the interval [0, 1).
-   uniform_real_distribution<double> dis{0.0,0.9999};
+		// Use random_device to generate a seed for Mersenne twister engine.
+		random_device rd{};
+		// Use Mersenne twister engine to generate pseudo-random numbers.
+		mt19937_64 engine{rd()};
+		// "Filter" MT engine's output to generate pseudo-random double values,
+		// **uniformly distributed** on the interval [0, 1).
+		uniform_real_distribution<double> dis{0.0,0.9999};
 
 		struct Stats{
 			int acceptance, rejection, nDisplacements;
@@ -81,18 +83,24 @@ class MC {
 			double binWidth, widom, rdf[NBINS+1];
 		} stats;
 		struct Simulation{
-			string compute[3], geometry;
+			string compute[3];
 			double dx, dy, dz, dv;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
 			double displaceProb, exchangeProb, volumeProb;
+			double systemEnergy, deltaParticleEnergy;
 			int step;
-			bool PBC[3];
 		} sim;
+		struct FrameWork{
+			string name, sfPot, geometry;
+			double sfEnergy, deltasfEnergy;
+			double boxWidth[3];
+			bool PBC[3];
+		} pore;
 		struct Fluid{
 			string name, vdwPot;
-			double temp, dens, molarMass, extPress, boxWidth, mu;
+			double temp, molarMass, dens, extPress, mu;
 			double rcut, sigma, epsilon;
-			double systemEnergy;
+			double ffEnergy, deltaffEnergy;
 			int nParts;
 		} fluid;
 		struct Particle{

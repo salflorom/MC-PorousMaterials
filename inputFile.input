@@ -1,36 +1,39 @@
 # Input script for running MC simulations.
 
-EquilibriumSets 0e1;
-ProductionSets 1e4;
-StepsPerSet 1e4;
+EquilibriumSets 0e0;
+ProductionSets 1e6;
+StepsPerSet 1e1;
 PrintEveryNSets 1e0;
-Temperature 87.3; #K
-#Temperature 293; #K
-ExternalPressure 101302.1424862485; #Pa
+#Temperature 87.3; #K
+Temperature 293; #K
+#ExternalPressure 101302.1424862485; #Pa
+ExternalPressure 1; #Pa
 
-name Ar;
-#name Ga;
-	NumberOfParticles 200;
+#name Ar;
+name Ga;
+	#NumberOfParticles 10;
 	#Density 0.005772370970132566; #g/cm^3
-	Density 1.395408450869877; #g/cm^3
-	MolarMass 39.948; #g/mol
-	VdWPotential lj; #LJ or EAM_Ga
-	sigma 3.4; #Angstrom
-	epsilon 119.6; #K
-	Rcut 17; #Angstrom
-	#ChemicalPotential -1141.3790680287825; #K. At 1 atm.
-	ChemicalPotential -1141.3790680288487; #K. At 1 atm.
+	##Density 1.39540852;
+	#MolarMass 39.948; #g/mol
+	#VdWPotential lj; #LJ or EAM_Ga
+	#sigma 3.4; #Angstrom
+	#epsilon 119.6; #K
+	#Rcut 17; #Angstrom
+	#ChemicalPotential -1141.3790680288487; #K. At 1 atm.
+	#Geometry Slit; #Sphere, Cylinder, Slit, Bulk.
+	##PoreSize 20; #Angstrom
 
-	#NumberOfParticles 200;
-	#Density 6.103; #g/cm^3
-	#MolarMass 69.723; #g/mol
-	#VdWPotential eam_ga;
-	#sigma 2.61; #Angstrom
-	#epsilon 1852; #K
-	#Rcut 8.3; #Angstrom
+	NumberOfParticles 250;
+	Density 6.103; #g/cm^3
+	MolarMass 69.723; #g/mol
+	VdWPotential eam_ga;
+	sigma 2.61; #Angstrom
+	epsilon 1852; #K
+	Rcut 8.3; #Angstrom
+	Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
 
 DisplacementProbability 0.5;
-ChangeVolumeProbability 0.5;
+#ChangeVolumeProbability 0.5;
 #ExchangeProbability 0.5;
 
 #EoS

@@ -34,7 +34,7 @@ class Operations {
 		double Pow(double value, int pow){
 			double result=value;
 
-			for (int i=0; i<pow; i++) result *= value;
+			for (int i=1; i<pow; i++) result *= value;
 			return result;
 		}
 /* **************************************************************************** */

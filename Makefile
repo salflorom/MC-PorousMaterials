@@ -6,7 +6,7 @@ PROG = mcexecutable
 all: $(PROG)
 
 $(PROG): $(OBJECTS)
-	$(CC) -o $(PROG) $(CFLAGS) $(OBJECTS) 
+	$(CC) -o $(PROG) $(CFLAGS) $(OBJECTS)
 MC.o: MC.cpp
 	$(CC) -c $(CFLAGS) MC.cpp
 main.o: main.cpp
