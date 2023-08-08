@@ -9,7 +9,7 @@
 #include <vector>
 #include <random>
 
-#define NBINS 100
+#define NBINS 500
 #define MAXPART 99999 //Max. num. of particles.
 #define pi M_PI
 #define kb 1.380649e-23 // J/K
@@ -30,9 +30,10 @@ class MC {
 		void InsertParticle(int);
 		void InitialConfig(void);
 		void MinimizeEnergy(void);
+		void AdjustMCMoves(void);
 		void MoveParticle(void);
 		void ChangeVolume(void);
-		void RescaleCenterOfMass(double initBoxWidth, double finalBoxWidth, bool rescale);
+		void RescaleCenterOfMass(double initBoxWidth, double finalBoxWidth);
 		void ExchangeParticle(void);
 		void PBC(int index);
 		void ComputeRDF(void);
@@ -44,19 +45,29 @@ class MC {
 		void ComputeWidom(void);
 		void ComputeChemicalPotential(void);
 		void EnergyOfParticle(int index);
+		double Random(void){return dis(engine);} //random num. in the interval [0,1).
 		double ComputeVolume(void);
 		double ComputeBoxWidth(double volume);
 		double* SystemEnergy(void);
+		double NeighDistance(int i, int j);
+
+		// Fluid-Fluid potentials //
 		double LJ_Energy(int i, int j);
-		// For EAM Ga potential vvvvv //
+		// EAM Ga potential vvvvv //
 		double EAMGA_Energy(int index);
 		double StepUnit(double radius, double leftLim, double rightLim);
 		double EmbPot(double rho);
 		double eDens(double radius);
 		double PairPot(double radius);
-		// For EAM Ga potential ^^^^^ //
-		double NeighDistance(int i, int j);
-		double Random(void){return dis(engine);} //random num. in the interval [0,1).
+		// EAM Ga potential ^^^^^ //
+		// Fluid-Fluid potentials //
+
+		// Solid-Fluid potentials //
+		double SlitLJ(int index);
+		double CylindricalLJ(int index);
+		double SphericalLJ(int index);
+		// Solid-Fluid potentials //
+
 		double* GetMCMoveProbabilities(void);
 		int GetNSets(void){return int(sim.nSets);}
 		int GetNEquilSets(void){return int(sim.nEquilSets);}
@@ -83,8 +94,8 @@ class MC {
 			double binWidth, widom, rdf[NBINS+1];
 		} stats;
 		struct Simulation{
-			string compute[3];
-			double dx, dy, dz, dv;
+			string rdf, compute[3];
+			double dr, dv;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
 			double displaceProb, exchangeProb, volumeProb;
 			double systemEnergy, deltaParticleEnergy;
@@ -92,9 +103,11 @@ class MC {
 		} sim;
 		struct FrameWork{
 			string name, sfPot, geometry;
-			double sfEnergy, deltasfEnergy;
-			double boxWidth[3];
 			bool PBC[3];
+			double boxWidth[3];
+			double sfEnergy, deltasfEnergy;
+			double sfDensity, sfEpsilon, sfSigma, deltaLayers;
+			int nLayersPerWall;
 		} pore;
 		struct Fluid{
 			string name, vdwPot;

@@ -41,18 +41,19 @@ int main(int argc, char** argv){
 			if (rand <= moveProbs[0]) mc.MoveParticle(); //Try displacement.
 			else if (rand <= moveProbs[1]) mc.ChangeVolume(); //Try volume change.
 			else if (rand <= moveProbs[2]) mc.ExchangeParticle(); //Try exchange.
-			if (set >= nEquilSets){
+			if (set > nEquilSets){
 				mc.ComputeWidom();
-				if (moveProbs[0] == 1) mc.ComputeRDF(); //Only for NVT simulations.
+				mc.ComputeRDF(); //Only for NVT simulations.
 			}
 		}
-		if ((set%printEvery == 0) && (set >= nEquilSets)){
+		if (set%printEvery == 0) mc.PrintStats(set);
+		if ((set%printEvery == 0) && (set > nEquilSets)){
 			mc.ComputeChemicalPotential();
-			if (moveProbs[0] == 1) mc.PrintRDF(set); //Only for NVT simulations.
-			mc.PrintStats(set);
+			mc.PrintRDF(set); //Only for NVT simulations.
 			mc.CreateEXYZ(set);
 			mc.CreateLogFile(set);
 		}
+		if (set <= nEquilSets) mc.AdjustMCMoves();
 	}
 	return EXIT_SUCCESS;
 }
