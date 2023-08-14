@@ -11,6 +11,7 @@
 #include <climits>
 
 #include "operations.h"
+#include "NumRecipes/hypgeo.h"
 #include "MC.h"
 
 using namespace std;
@@ -40,10 +41,26 @@ MC::MC(void){
 	fluid.extPress = 0.;
 	pore.sfEnergy = 0.;
 	for (i=0; i<3; i++) pore.boxWidth[i] = 0;
-	pore.name = pore.sfPot = "";
+	pore.name = "Box0";
+	pore.sfPot = "";
 	pore.geometry = "bulk";
 	pore.nLayersPerWall = 0;
 	pore.sfDensity = pore.sfEpsilon = pore.sfSigma = pore.deltaLayers = 0.;
+}
+string MC::OutputDirectory(bool createDir){
+	Operations ops;
+	ostringstream outDirName, command;
+	double temp=fluid.temp;
+
+	outDirName << "output_" << pore.name << "_" << pore.geometry << "_" << fluid.name << "_" << temp << "_";
+	if (sim.volumeProb > 0) outDirName << fluid.extPress;
+	else if (sim.exchangeProb > 0) outDirName << pore.boxWidth[2] << "_" << fluid.mu;
+	else outDirName << pore.boxWidth[2];
+	if (createDir) {
+		command << "rm -r " << outDirName.str() << "; mkdir " << outDirName.str();
+		system(command.str().c_str());
+	}
+	return outDirName.str();
 }
 void MC::ResetStats(void){
 	stats.acceptance = stats.rejection = stats.nDisplacements = 0;
@@ -52,7 +69,6 @@ void MC::ResetStats(void){
 	stats.acceptDeletion = stats.rejectDeletion = stats.nExchanges = 0;
 	stats.widomInsertions = 0;
 	stats.widom = 0.;
-	for (int bin=1; bin<=NBINS; bin++) stats.rdf[bin] = 0.;
 }
 void MC::ReadInputFile(string inFileName){
 	double volume;
@@ -171,7 +187,7 @@ void MC::PrintParams(void){
 	cout << endl;
 
 	cout << "Simulation parameters:" << endl;
-	if (sim.rdf != "no") cout << "\tSample RDF" << endl;
+	if (sim.rdf != "no") cout << "\tSample RDF: Yes" << endl;
 	cout << "\tDisplacement probability: " << sim.displaceProb << endl;
 	cout << "\tChange volume probability: " << sim.volumeProb << endl;
 	cout << "\tExchange probability: " << sim.exchangeProb << endl;
@@ -252,7 +268,7 @@ void MC::MinimizeEnergy(void){
 	int initMoves = 200;
 	double* energy;
 
-	if (fluid.nParts > 1){
+	if (fluid.nParts > 0){
 		sim.systemEnergy = SystemEnergy()[0];
 		cout << "Minimizing initial configuration" << endl;
 		cout << "Energy/part. before minimization: ";
@@ -273,34 +289,40 @@ void MC::MinimizeEnergy(void){
 void MC::MoveParticle(void){
 	int index;
 	double initialEnergy, finalEnergy, deltaEnergy, argument;
-	double initialffEnergy, finalffEnergy;
+	double initialffPairPot, initialffManyBody, finalffPairPot, finalffManyBody;
 	double initialsfEnergy, finalsfEnergy;
+	double deltaffManyBody=0, deltaffPairPot=0, deltasfEnergy=0;
 
 	stats.nDisplacements++;
 	// Select particle.
 	index = int(Random()*fluid.nParts)+1;
 	part[0] = part[index]; //Save old position of selected particle.
 	EnergyOfParticle(index);
-	initialEnergy = sim.deltaParticleEnergy;
-	initialffEnergy = fluid.deltaffEnergy;
+	initialffManyBody = fluid.deltaffManybody;
+	initialffPairPot = fluid.deltaffPairPot;
 	initialsfEnergy = pore.deltasfEnergy;
+	initialEnergy = initialffManyBody + initialffPairPot + initialsfEnergy;
 	// Move particle.
 	part[index].x += (Random()-0.5)*sim.dr; //AA
 	part[index].y += (Random()-0.5)*sim.dr; //AA
 	part[index].z += (Random()-0.5)*sim.dr; //AA
 	PBC(index);
 	EnergyOfParticle(index);
-	finalEnergy = sim.deltaParticleEnergy;
-	finalffEnergy = fluid.deltaffEnergy;
+	finalffManyBody = fluid.deltaffManybody;
+	finalffPairPot = fluid.deltaffPairPot;
 	finalsfEnergy = pore.deltasfEnergy;
+	finalEnergy = finalffManyBody + finalffPairPot + finalsfEnergy;
 	// Metropolis.
 	deltaEnergy = finalEnergy-initialEnergy;
-	argument = -deltaEnergy/fluid.temp;
-	if (exp(argument) > Random()){
+	argument = deltaEnergy/fluid.temp;
+	if (Random() < exp(-argument)){
 		stats.acceptance++;
-		sim.systemEnergy += deltaEnergy;
-		fluid.ffEnergy += finalffEnergy-initialffEnergy;
-		pore.sfEnergy += finalsfEnergy-initialsfEnergy;
+		deltaffManyBody = finalffManyBody - initialffManyBody;
+		deltaffPairPot = finalffPairPot - initialffPairPot;
+		deltasfEnergy = finalsfEnergy - initialsfEnergy;
+		sim.systemEnergy += deltaffManyBody + 0.5*deltaffPairPot + deltasfEnergy;
+		fluid.ffEnergy += deltaffManyBody + 0.5*deltaffPairPot;
+		pore.sfEnergy += deltasfEnergy;
 	}
 	else{
 		part[index] = part[0];
@@ -314,11 +336,11 @@ void MC::AdjustMCMoves(void){
 	if (ratio < 0.3) sim.dr /= 1.1;
 	else sim.dr *= 1.1;
 
-	if (sim.volumeProb > 0){
-		ratio = stats.acceptanceVol*1./(1.*stats.nVolChanges);
-		if (ratio < 0.3) sim.dv /= 1.1;
-		else sim.dv *= 1.1;
-	}
+	//if (sim.volumeProb > 0){
+		//ratio = stats.acceptanceVol*1./(1.*stats.nVolChanges);
+		//if (ratio < 0.5) sim.dv /= 1.1;
+		//else sim.dv *= 1.1;
+	//}
 }
 // PBC for a box with the origin at the lower left vertex.
 void MC::PBC(int index){
@@ -329,10 +351,10 @@ void MC::PBC(int index){
 double MC::ComputeVolume(void){
 	Operations ops;
 
-	if (pore.geometry == "sphere") return (4*pi/3.)*ops.Pow(pore.boxWidth[2]*0.5,3);
-	else if (pore.geometry == "cylinder") return pi*ops.Pow(pore.boxWidth[2]*0.5,2)*pore.boxWidth[0];
+	if (pore.geometry == "sphere") return (pi/6.)*ops.Pow(pore.boxWidth[2],3);
+	else if (pore.geometry == "cylinder") return (pi/4.)*ops.Pow(pore.boxWidth[2],2)*pore.boxWidth[0];
 	else if (pore.geometry == "slit") return pore.boxWidth[0]*pore.boxWidth[1]*pore.boxWidth[2];
-	else return ops.Pow(pore.boxWidth[2],3);
+	else return ops.Pow(pore.boxWidth[2],3); // Bulk phase.
 }
 // Computes the length of the box along the z axis.
 double MC::ComputeBoxWidth(double volume){
@@ -342,27 +364,31 @@ double MC::ComputeBoxWidth(double volume){
 	else return cbrt(volume); //Bulk phase.
 }
 void MC::RescaleCenterOfMass(double initBoxWidth, double finalBoxWidth){
+	Operations ops;
 	int i;
+	double ratio = finalBoxWidth/initBoxWidth;
 
 	//if (pore.geometry == "sphere"){
 		//for (i=1; i<=fluid.nParts; i++){
-			//part[i].x *= finalBoxWidth/initBoxWidth;
-			//part[i].y *= finalBoxWidth/initBoxWidth;
-			//part[i].z *= finalBoxWidth/initBoxWidth;
+			//part[i].x *= ratio;
+			//part[i].y *= ratio;
+			//part[i].z *= ratio;
 		//}
 	//}else if (pore.geometry == "cylinder"){
 		//for (i=1; i<=fluid.nParts; i++){
-			//part[i].y *= finalBoxWidth/initBoxWidth;
-			//part[i].z *= finalBoxWidth/initBoxWidth;
+			//part[i].y *= ratio;
+			//part[i].z *= ratio;
 		//}
 	//}else if (pore.geometry == "slit"){
-		//for (i=1; i<=fluid.nParts; i++) part[i].z *= finalBoxWidth/initBoxWidth;
+		//for (i=1; i<=fluid.nParts; i++) part[i].z *= ratio;
 	//}else{ //Bulk phase.
 		for (i=1; i<=fluid.nParts; i++){
-			part[i].x *= finalBoxWidth/initBoxWidth;
-			part[i].y *= finalBoxWidth/initBoxWidth;
-			part[i].z *= finalBoxWidth/initBoxWidth;
+			part[i].x *= ratio;
+			part[i].y *= ratio;
+			part[i].z *= ratio;
 		}
+		sim.dr *= ratio;
+		sim.dv *= ratio;
 	//}
 }
 void MC::ChangeVolume(void){
@@ -417,7 +443,7 @@ void MC::ExchangeParticle(void){
 	double argument=0;
 
 	particleMass = fluid.molarMass/na*1e-3; // kg/particle
-	thermalWL = plank/sqrt(2*pi*particleMass*kb*fluid.temp)*1e10; // AA
+	thermalWL = planck/sqrt(2.0*pi*particleMass*kb*fluid.temp)*1e10; // AA
 	zz = exp(fluid.mu/fluid.temp)/ops.Pow(thermalWL,3); // AA^-3
 	volume = ComputeVolume(); //AA^3
 	if (Random() < 0.5) { // Try inserting particle.
@@ -426,13 +452,13 @@ void MC::ExchangeParticle(void){
 		index = fluid.nParts+1;
 		InsertParticle(index);
 		EnergyOfParticle(index);
-		energy = sim.deltaParticleEnergy; // K
+		energy = fluid.deltaffManybody + fluid.deltaffPairPot + pore.deltasfEnergy; // K
 		argument = zz*volume*exp(-energy/fluid.temp)/(fluid.nParts+1); // Acceptance criterion (for inserting particle).
 		if (Random() < argument){
 			stats.acceptInsertion++; // Accepted: Insert particle.
 			fluid.nParts++;
-			sim.systemEnergy += energy;
-			fluid.ffEnergy += fluid.deltaffEnergy;
+			sim.systemEnergy += fluid.deltaffManybody + 0.5*fluid.deltaffPairPot + pore.deltasfEnergy;
+			fluid.ffEnergy += fluid.deltaffManybody + 0.5*fluid.deltaffPairPot;
 			pore.sfEnergy += pore.deltasfEnergy;
 		}else stats.rejectInsertion++;
 	}else if (fluid.nParts > 0){ // Try removing particle (only if there are particles in the box).
@@ -440,24 +466,25 @@ void MC::ExchangeParticle(void){
 		// Select random particle.
 		index = int(Random()*fluid.nParts)+1;
 		EnergyOfParticle(index); //K
-		energy = sim.deltaParticleEnergy;
+		energy = fluid.deltaffManybody + fluid.deltaffPairPot + pore.deltasfEnergy;
 		argument = fluid.nParts*exp(energy/fluid.temp)/(zz*volume); // Acceptance criterion (for removing particle).
 		if (Random() < argument){ // Accepted: Remove particle.
 			stats.acceptDeletion++;
-			for (int i=index; i<fluid.nParts; i++) part[i] = part[i+1]; //Fill in the gap left by removal.
+			part[index] = part[fluid.nParts];
 			fluid.nParts--;
-			sim.systemEnergy -= energy;
-			fluid.ffEnergy -= fluid.deltaffEnergy;
+			sim.systemEnergy -= fluid.deltaffManybody + 0.5*fluid.deltaffPairPot + pore.deltasfEnergy;
+			fluid.ffEnergy -= fluid.deltaffManybody + 0.5*fluid.deltaffPairPot;
 			pore.sfEnergy -= pore.deltasfEnergy;
 		}else stats.rejectDeletion++;
 	}
 }
 void MC::EnergyOfParticle(int index){
 	Operations ops;
+	double* tmp;
 	double xPos, yPos, zPos, sqrPoreRadius;
 	double sqrDistFromBoxCenter = 0.;
 
-	sim.deltaParticleEnergy = fluid.deltaffEnergy = pore.deltasfEnergy = 0.;
+	fluid.deltaffManybody = fluid.deltaffPairPot = pore.deltasfEnergy = 0.;
 	// Particle must not be out of boundaries.
 	sqrPoreRadius = pore.boxWidth[2]*pore.boxWidth[2]*0.25;
 	xPos = part[index].x - 0.5*pore.boxWidth[0]; //Move positions virtually to center of box.
@@ -466,32 +493,33 @@ void MC::EnergyOfParticle(int index){
 	if (pore.geometry == "sphere") sqrDistFromBoxCenter = xPos*xPos + yPos*yPos + zPos*zPos;
 	else if (pore.geometry == "cylinder") sqrDistFromBoxCenter = yPos*yPos + zPos*zPos;
 	else if (pore.geometry == "slit") sqrDistFromBoxCenter = zPos*zPos;
-	if (sqrDistFromBoxCenter >= sqrPoreRadius) pore.deltasfEnergy = INT_MAX;
+	if ((sqrDistFromBoxCenter > sqrPoreRadius) || (sqrDistFromBoxCenter < 0)) pore.deltasfEnergy = INT_MAX;
 	//Solid-Fluid energy
 	if (pore.sfPot == "lj" && pore.geometry == "sphere") pore.deltasfEnergy += SphericalLJ(index);
 	else if (pore.sfPot == "lj" && pore.geometry == "cylinder") pore.deltasfEnergy += CylindricalLJ(index);
 	else if (pore.sfPot == "lj" && pore.geometry == "slit") pore.deltasfEnergy += SlitLJ(index);
 	//Fluid-Fluid energy
 	if (fluid.vdwPot == "lj"){ //Lennard-Jones potential.
-		for (int i=1; i<=fluid.nParts; i++) fluid.deltaffEnergy += LJ_Energy(index,i);
-		fluid.deltaffEnergy *= 0.5;
+		for (int i=1; i<=fluid.nParts; i++) fluid.deltaffPairPot += LJ_Energy(index,i);
 	}else if (fluid.vdwPot == "eam_ga"){ //EAM potential for Ga.
-		fluid.deltaffEnergy += EAMGA_Energy(index);
+		tmp = EAMGA_Energy(index);
+		fluid.deltaffManybody += tmp[0];
+		fluid.deltaffPairPot += tmp[1];
 	}
-	sim.deltaParticleEnergy = fluid.deltaffEnergy + pore.deltasfEnergy;
 }
 double* MC::SystemEnergy(void){
-	double energy=0, ffEnergy=0, sfEnergy=0;
+	double energy=0, ffManyBody=0, ffPairPot=0, sfEnergy=0;
 	static double energies[3];
 
 	for (int i=1; i<=fluid.nParts; i++){
 		EnergyOfParticle(i);
-		energy += sim.deltaParticleEnergy;
-		ffEnergy += fluid.deltaffEnergy;
+		ffManyBody = fluid.deltaffManybody;
+		ffPairPot += fluid.deltaffPairPot;
 		sfEnergy += pore.deltasfEnergy;
 	}
+	energy = ffManyBody + 0.5*ffPairPot + sfEnergy;
 	energies[0] = energy;
-	energies[1] = ffEnergy;
+	energies[1] = ffManyBody + 0.5*ffPairPot;
 	energies[2] = sfEnergy;
 	return energies;
 }
@@ -503,7 +531,7 @@ void MC::ComputeWidom(void){
 		InsertParticle(MAXPART-1); // Insert virtual particle.
 		stats.widomInsertions++;
 		EnergyOfParticle(MAXPART-1);
-		energy = sim.deltaParticleEnergy;
+		energy = fluid.deltaffManybody + fluid.deltaffPairPot + pore.deltasfEnergy;
 		if (sim.volumeProb > 0){
 			volume = ComputeVolume();
 			stats.widom += volume*exp(-energy/fluid.temp);
@@ -512,12 +540,12 @@ void MC::ComputeWidom(void){
 }
 void MC::ComputeChemicalPotential(void){
 	Operations ops;
-	double thermalWL, partMass, volume, muIdeal, muExcess, insertionParam;
+	double thermalWL, particleMass, volume, muIdeal, muExcess, insertionParam;
 	double extPress;
 
 	if (sim.exchangeProb == 0){
-		partMass = fluid.molarMass/na*1e-3; // kg/particle
-		thermalWL = plank/sqrt(2*pi*partMass*kb*fluid.temp)*1e10; //AA
+		particleMass = fluid.molarMass/na*1e-3; // kg/particle
+		thermalWL = planck/sqrt(2.0*pi*particleMass*kb*fluid.temp)*1e10; //AA
 		volume = ComputeVolume(); //AA^3
 		insertionParam = stats.widom/stats.widomInsertions;
 		if (sim.volumeProb > 0){
@@ -546,31 +574,30 @@ void MC::ComputeRDF(void){
 		}
 	}
 }
-void MC::PrintRDF(int set){
+void MC::PrintRDF(void){
 	double constant, deltaR, lowR, highR, rho, dn_ideal, gofr[NBINS+1];
 	Operations ops;
 	ofstream rdfFile;
-	string outFileName="stats/rdf.dat";
+	ostringstream outFileName;
 
+	outFileName << OutputDirectory(false) << "/rdf.dat";
 	if (sim.rdf != "no"){
 		deltaR = fluid.rcut/NBINS;
 		rho = fluid.nParts/ComputeVolume();
 		constant = (4*pi*rho/3);
 		for (int bin=1; bin<=NBINS; bin++){
-			gofr[bin] = stats.rdf[bin]/(1.*fluid.nParts*sim.nStepsPerSet);
+			gofr[bin] = stats.rdf[bin]/(1.*fluid.nParts*sim.nStepsPerSet*sim.nSets);
 			lowR = bin*deltaR;
 			highR = lowR + deltaR;
 			dn_ideal = constant*(ops.Pow(highR,3)-ops.Pow(lowR,3));
 			gofr[bin] /= dn_ideal;
 		}
 		//Write into the file.
-		if (ops.FileExists(outFileName)) rdfFile.open(outFileName, ios::app);
-		else rdfFile.open(outFileName);
-		rdfFile << "nBins; set: "<< NBINS << "; " << set << endl;
-		rdfFile << "r(AA)\tg(r)" << endl;
-		for (int bin=1; bin<=NBINS; bin++){
-			rdfFile << (bin+0.5)*deltaR << "\t" << gofr[bin] << endl;
-		}
+		if (ops.FileExists(outFileName.str())) rdfFile.open(outFileName.str(), ios::app);
+		else rdfFile.open(outFileName.str());
+		rdfFile << "nBins: "<< NBINS << endl;
+		rdfFile << "r[AA]\tg(r)" << endl;
+		for (int bin=1; bin<=NBINS; bin++) rdfFile << (bin+0.5)*deltaR << "\t" << gofr[bin] << endl;
 		rdfFile.close();
 	}
 }
@@ -610,11 +637,12 @@ void MC::PrintStats(int set){
 void MC::CreateEXYZ(int set){
 	Operations ops;
 	ofstream trajFile;
-	string outFileName="stats/trajectory.exyz";
+	ostringstream outFileName;
 	double tmp=0.0;
 
-	if (ops.FileExists(outFileName)) trajFile.open(outFileName, ios::app);
-	else trajFile.open(outFileName);
+	outFileName << OutputDirectory(false) << "/trajectory.exyz";
+	if (ops.FileExists(outFileName.str())) trajFile.open(outFileName.str(), ios::app);
+	else trajFile.open(outFileName.str());
 	trajFile << fluid.nParts << "\n";
 	trajFile << "Lattice=\" " << pore.boxWidth[0] << " " << tmp << " " << tmp << " ";
 	trajFile << tmp << " " << pore.boxWidth[1] << " " << tmp << " ";
@@ -629,22 +657,24 @@ void MC::CreateEXYZ(int set){
 void MC::CreateLogFile(int set){
 	Operations ops;
 	ofstream logFile;
-	string outFileName="stats/simulation.log";
+	ostringstream outFileName;
 	double density, volume;
 
+	outFileName << OutputDirectory(false) << "/simulation.log";
 	volume = ComputeVolume(); //AA^3
 	density = fluid.nParts/volume; // AA^-3
 	density *= fluid.molarMass/na*1e24; // g/cm^3
-	if (!ops.FileExists(outFileName)){
-		logFile.open(outFileName);
-		logFile << "Set\tNParts\tDens[g/cm^3]\t";
+	if (!ops.FileExists(outFileName.str())){
+		logFile.open(outFileName.str());
+		logFile << "Set\tTemp[K]\tNParts\tDens[g/cm^3]\t";
 		logFile << "boxWidth[AA]\tVolume[AA^3]\t";
 		logFile << "ffE/part[K]\tsfE/part[K]\tE/part[K]\tmu[K]\n";
 	}else{
-		logFile.open(outFileName, ios::app);
+		logFile.open(outFileName.str(), ios::app);
 		logFile << fixed;
 		logFile << setprecision(5);
 		logFile << set << "\t";
+		logFile << fluid.temp << "\t";
 		logFile << fluid.nParts << "\t";
 		logFile << density << "\t";
 		logFile << pore.boxWidth[2] << "\t";
@@ -659,9 +689,9 @@ void MC::CreateLogFile(int set){
 double MC::NeighDistance(int i, int j){
 	double dist, dx, dy, dz;
 
-	dx = part[j].x - part[i].x; //AA
-	dy = part[j].y - part[i].y; //AA.
-	dz = part[j].z - part[i].z; //AA.
+	dx = part[i].x - part[j].x; //AA
+	dy = part[i].y - part[j].y; //AA.
+	dz = part[i].z - part[j].z; //AA.
 	if (pore.PBC[0]) dx -= round(dx/pore.boxWidth[0]) * pore.boxWidth[0]; //AA
 	if (pore.PBC[1]) dy -= round(dy/pore.boxWidth[1]) * pore.boxWidth[1]; //AA
 	if (pore.PBC[2]) dz -= round(dz/pore.boxWidth[2]) * pore.boxWidth[2]; //AA
@@ -674,7 +704,7 @@ double MC::LJ_Energy(int i, int j){
 	Operations ops;
 	double rij;
 	double eps=fluid.epsilon, sig=fluid.sigma, rcut=fluid.rcut;
-	double energy;
+	double energy=0;
 
 	if (i != j) {
 		rij = NeighDistance(i, j);
@@ -687,8 +717,9 @@ double MC::LJ_Energy(int i, int j){
 // Belashchenko, D.K., 2012.
 // Computer Simulation of the Properties of Liquid Metals: Gallium, Lead, and Bismuth.
 // Russ. J. Phys. Chem. A, 86, pp.779-790.
-double MC::EAMGA_Energy(int index){
-	double rij, energy;
+double* MC::EAMGA_Energy(int index){
+	static double energy[2];
+	double rij;
 	double rho=0, phiLow=0;
 	double eVToK = (801088317./5.0e27)/kb;
 
@@ -701,8 +732,8 @@ double MC::EAMGA_Energy(int index){
 			}
 		}
 	}
-	energy = EmbPot(rho) + phiLow;
-	energy *= eVToK;
+	energy[0] = EmbPot(rho)*eVToK;
+	energy[1] = phiLow*eVToK;
 	return energy;
 }
 double MC::StepUnit(double radius, double leftLim, double rightLim){
@@ -793,23 +824,29 @@ double MC::SlitLJ(int index){
 // Tjatjopoulos et al., 1988.
 // Molecule-Micropore Interaction Potentials.
 // J. Phys. Chem., 92(13), pp.4006-4007.
+// Source for hypergeometric function:
+// Press, W.H., 2007.
+// Numerical recipes 3rd edition: The art of scientific computing.
+// Cambridge university press.
 double MC::CylindricalLJ(int index){
 	Operations ops;
+	double yPos, zPos;
 	double x, u1, u2, usf, rho;
 	double sizeR = pore.boxWidth[2]*0.5; // AA
 	double dens = pore.sfDensity; // AA^-2
 	double eps = pore.sfEpsilon; // K
 	double sig = pore.sfSigma; // AA
 
-	rho = sqrt(ops.Pow(part[index].y-sizeR,2) + ops.Pow(part[index].z-sizeR,2));
+	yPos = part[index].y - 0.5*pore.boxWidth[1];
+	zPos = part[index].z - 0.5*pore.boxWidth[2];
+	rho = sqrt(ops.Pow(yPos,2) + ops.Pow(zPos,2));
 	// Reducing units/
 	dens *= sig*sig;
 	sizeR /= sig;
 	rho /= sig;
-	// Usf_0:
 	x = sizeR-rho;
-	u1 = 63. /32. * 1./(ops.Pow(x,10)*ops.Pow(2.-x/sizeR,10)) * ops.Hyp2F1(-4.5,-4.5,1.,ops.Pow(1-x/sizeR,2));
-	u2 = 3. / (ops.Pow(x,4)*ops.Pow(2.-x/sizeR,4)) * ops.Hyp2F1(-1.5,-1.5,1.,ops.Pow(1.-x/sizeR,2));
+	u1 = 63. /32. * 1./(ops.Pow(x,10)*ops.Pow(2.0-x/sizeR,10)) * hypgeo(-4.5,-4.5,1.,ops.Pow(1-x/sizeR,2));
+	u2 = 3. / (ops.Pow(x,4)*ops.Pow(2.0-x/sizeR,4)) * hypgeo(-1.5,-1.5,1.,ops.Pow(1.0-x/sizeR,2));
 	usf = (u1-u2)*pi*pi*dens*eps; // K
 	return usf;
 }
@@ -819,6 +856,7 @@ double MC::CylindricalLJ(int index){
 // AIChE J., 37(6), pp.923-930.
 double MC::SphericalLJ(int index){
 	Operations ops;
+	double xPos, yPos, zPos;
 	double r, x, usf;
 	double sizeR = pore.boxWidth[2]*0.5;
 	double dens = pore.sfDensity;
@@ -826,21 +864,25 @@ double MC::SphericalLJ(int index){
 	double sig = pore.sfSigma;
 	double u1=0, u2=0;
 
-	r = sqrt(ops.Pow(part[index].x-sizeR,2) + ops.Pow(part[index].y-sizeR,2) + ops.Pow(part[index].z-sizeR,2));
+	xPos = part[index].x - 0.5*pore.boxWidth[0];
+	yPos = part[index].y - 0.5*pore.boxWidth[1];
+	zPos = part[index].z - 0.5*pore.boxWidth[2];
+	r = sqrt(ops.Pow(xPos,2) + ops.Pow(yPos,2) + ops.Pow(zPos,2));
 	// Reducing units/
+	dens *= sig*sig;
 	sizeR /= sig;
 	r /= sig;
 	x = sizeR-r;
 	for (int i=0; i<10; i++){
 		u1 += 1. / ops.Pow(sizeR,i) / ops.Pow(x,10-i);
-		u1 += ops.Pow(-1.,i) / ops.Pow(sizeR,i) / ops.Pow(x-2.*sizeR,10-i);
+		u1 += ops.Pow(-1.0,i) / ops.Pow(sizeR,i) / ops.Pow(x-2.0*sizeR,10-i);
 		if (i < 4){
 			u2 += 1. / ops.Pow(sizeR,i) / ops.Pow(x,4-i);
-			u2 += ops.Pow(-1.,i) / ops.Pow(sizeR,i) / ops.Pow(x-2.*sizeR,4-i);
+			u2 += ops.Pow(-1.0,i) / ops.Pow(sizeR,i) / ops.Pow(x-2.0*sizeR,4-i);
 		}
 	}
 	usf = (2./5.) * u1 - u2;
-	usf *= 2.*pi*eps*dens*sig*sig; //K
+	usf *= 2.*pi*eps*dens; //K
 	return usf;
 }
 // ---------- Solid-Fluid potentials ---------- //

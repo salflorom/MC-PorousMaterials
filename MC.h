@@ -13,8 +13,8 @@
 #define MAXPART 99999 //Max. num. of particles.
 #define pi M_PI
 #define kb 1.380649e-23 // J/K
-#define na 6.02214e23 // mol^-1
-#define plank 1.054571817e-34 // J*s
+#define na 6.02214076e23 // mol^-1
+#define planck 6.62607015e-34 // J*s
 
 using namespace std;
 
@@ -24,6 +24,7 @@ class MC {
 	public:
 /* **************************************************************************** */
 		MC(void);
+		string OutputDirectory(bool createDir);
 		void ReadInputFile(string inFileName);
 		void ResetStats(void);
 		void PrintParams(void);
@@ -37,7 +38,7 @@ class MC {
 		void ExchangeParticle(void);
 		void PBC(int index);
 		void ComputeRDF(void);
-		void PrintRDF(int set);
+		void PrintRDF(void);
 		void Metropolis(int index);
 		void CreateEXYZ(int step);
 		void CreateLogFile(int step);
@@ -54,7 +55,7 @@ class MC {
 		// Fluid-Fluid potentials //
 		double LJ_Energy(int i, int j);
 		// EAM Ga potential vvvvv //
-		double EAMGA_Energy(int index);
+		double* EAMGA_Energy(int index);
 		double StepUnit(double radius, double leftLim, double rightLim);
 		double EmbPot(double rho);
 		double eDens(double radius);
@@ -113,7 +114,7 @@ class MC {
 			string name, vdwPot;
 			double temp, molarMass, dens, extPress, mu;
 			double rcut, sigma, epsilon;
-			double ffEnergy, deltaffEnergy;
+			double ffEnergy, deltaffManybody, deltaffPairPot;
 			int nParts;
 		} fluid;
 		struct Particle{

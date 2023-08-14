@@ -21,11 +21,10 @@ int main(int argc, char** argv){
 	double rand;
 	MC mc;
 
-	system("rm -r stats; mkdir stats");
-
 	inFileName = argv[1];
 	mc.ReadInputFile(inFileName);
 	mc.PrintParams();
+	mc.OutputDirectory(true);
 	mc.InitialConfig();
 	nSets = mc.GetNSets();
 	nEquilSets = mc.GetNEquilSets();
@@ -43,18 +42,18 @@ int main(int argc, char** argv){
 			else if (rand <= moveProbs[2]) mc.ExchangeParticle(); //Try exchange.
 			if (set > nEquilSets){
 				mc.ComputeWidom();
-				mc.ComputeRDF(); //Only for NVT simulations.
+				mc.ComputeRDF();
 			}
 		}
 		if (set%printEvery == 0) mc.PrintStats(set);
 		if ((set%printEvery == 0) && (set > nEquilSets)){
 			mc.ComputeChemicalPotential();
-			mc.PrintRDF(set); //Only for NVT simulations.
 			mc.CreateEXYZ(set);
 			mc.CreateLogFile(set);
 		}
 		if (set <= nEquilSets) mc.AdjustMCMoves();
 	}
+	mc.PrintRDF();
 	return EXIT_SUCCESS;
 }
 
