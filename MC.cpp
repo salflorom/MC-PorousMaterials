@@ -1,4 +1,4 @@
-//Author: Santiago A. Flores202020202020 Roman
+//Author: Santiago A. Flores Roman
 
 #include <cstring>
 #include <cmath>
@@ -10,8 +10,9 @@
 #include <climits>
 #include <filesystem>
 
-#include "tools.h"
 #include "MC.h"
+#include "tools.h"
+#include "NumRecipes/hypgeo.h"
 
 using namespace std;
 
@@ -31,7 +32,7 @@ MC::MC(void){
 	sim.dr = 1;
 	sim.dv = 1e-1;
 	sim.nEquilSets = sim.nSets = sim.nCyclesPerSet = 0.;
-	sim.nVolAttempts = sim.nSwapAttempts = 0.;
+	sim.nDispAttempts = sim.nVolAttempts = sim.nSwapAttempts = 0;
 	thermoSys.temp = thermoSys.volume = thermoSys.press = -1.;
 	thermoSys.nBoxes = 0;
 	thermoSys.nSpecies = 0;
@@ -45,6 +46,7 @@ MC::MC(void){
 			box[i].fluid[j].nParts = 0;
 			box[i].fluid[j].vdwPot[0] = "";
 			box[i].fluid[j].epsilon[0] = box[i].fluid[j].sigma[0] = 0.;
+			box[i].fluid[j].mu = 0;
 			for (k=0; k<MAXPART; k++){
 				box[i].fluid[j].particle[k].x = 0.;
 				box[i].fluid[j].particle[k].y = 0.;
@@ -105,6 +107,7 @@ void MC::ReadInputFile(string inFileName){
 		else if (commands[0] == "equilibriumsets") sim.nEquilSets = stod(commands[1]);
 		else if (commands[0] == "cyclesperset") sim.nCyclesPerSet = stod(commands[1]);
 		else if (commands[0] == "printeverynsets") sim.printEvery = stod(commands[1]);
+		else if (commands[0] == "ndisplacementattempts") sim.nDispAttempts = stoi(commands[1]);
 		else if (commands[0] == "nvolumeattempts") sim.nVolAttempts = stoi(commands[1]);
 		else if (commands[0] == "nswapattempts") sim.nSwapAttempts = stoi(commands[1]);
 		else if (commands[0] == "externaltemperature") thermoSys.temp = stod(commands[1]); // K
@@ -204,7 +207,10 @@ void MC::ReadInputFile(string inFileName){
 			box[i].PBC[0] = true;
 			box[i].PBC[1] = true;
 			box[i].PBC[2] = true;
-		}
+		} }
+	// Set chemical potential to boxes if given.
+	for (i=0; i<thermoSys.nBoxes; i++){
+		for (j=0; j< thermoSys.nSpecies; j++) box[i].fluid[j].mu = fluid[j].mu;
 	}
 	// Set step size.
 	//sim.dr = fluid[0].sigma[0]; //AA
@@ -218,6 +224,7 @@ void MC::PrintParams(void){
 	cout << "\tProduction sets: " << sim.nSets << endl;
 	cout << "\tCycles per set: " << sim.nCyclesPerSet << endl;
 	cout << "\tPrint every n sets: " << sim.printEvery << endl;
+	cout << "\tNum. of displacement attempts: " << sim.nDispAttempts << endl;
 	cout << "\tNum. of change volume attempts: " << sim.nVolAttempts << endl;
 	cout << "\tNum. of swap attempts: " << sim.nSwapAttempts << endl;
 	cout << endl;
@@ -233,7 +240,7 @@ void MC::PrintParams(void){
 	for (i=0; i<thermoSys.nSpecies; i++){
 		cout << "Species " << i << ": " << fluid[i].name << endl;
 		cout << "\tMolar mass (g/mol): " << fluid[i].molarMass << endl;
-		if (fluid[i].mu > 0) cout << "\tChemical potential (K): " << fluid[i].mu << endl;
+		if (fluid[i].mu = 0) cout << "\tChemical potential (K): " << fluid[i].mu << endl;
 	}
 	cout << endl;
 
@@ -298,7 +305,7 @@ void MC::OutputDirectory(void){
 	Tools tls;
 	ostringstream outDirName, boxDirName, command;
 
-	outDirName << "output_" << thermoSys.nParts << "_" << thermoSys.temp << "K";
+	outDirName << "output_" << thermoSys.temp << "K";
 	if (! std::filesystem::is_directory(outDirName.str())){
 		command << "mkdir " << outDirName.str();
 		system(command.str().c_str());
@@ -361,7 +368,7 @@ void MC::InitialConfig(void){
 int* MC::GetMCMoves(void){
 	static int moves[3];
 
-	moves[0] = thermoSys.nParts;
+	moves[0] = sim.nDispAttempts;
 	moves[1] = sim.nVolAttempts;
 	moves[2] = sim.nSwapAttempts;
 	return moves;
@@ -392,13 +399,12 @@ void MC::EnergyOfParticle(int ithBox, int ithSpecies, int index){
 		box[ithBox].fluid[ithSpecies].particle[index].boxE = INT_MAX;
 	}
 	//Particle-box energy
-	if (box[ithBox].vdwPot == "lj" && box[ithBox].geometry == "sphere"){
-		//box[ithBox].fluid[ithSpecies].particle[index].boxE += SphericalLJ(ithBox, ithPart);
-	}
-	else if (box[ithBox].vdwPot == "lj" && box[ithBox].geometry == "cylinder"){
-		//box[ithBox].fluid[ithSpecies].particle[index].boxE += CylindricalLJ(ithBox, ithPart);
-	}else if (box[ithBox].vdwPot == "lj" && box[ithBox].geometry == "slit"){
-		//box[ithBox].fluid[ithSpecies].particle[index].boxE += SlitLJ(ithBox, ithPart);
+	if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "lj" && box[ithBox].geometry == "sphere"){
+		box[ithBox].fluid[ithSpecies].particle[index].boxE += SphericalLJ(ithBox, ithSpecies, index);
+	}else if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "lj" && box[ithBox].geometry == "cylinder"){
+		box[ithBox].fluid[ithSpecies].particle[index].boxE += CylindricalLJ(ithBox, ithSpecies, index);
+	}else if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "lj" && box[ithBox].geometry == "slit"){
+		box[ithBox].fluid[ithSpecies].particle[index].boxE += SlitLJ(ithBox, ithSpecies, index);
 	}
 	//Fluid-Fluid energy
 	for (int jthSpecies=0; jthSpecies<thermoSys.nSpecies; jthSpecies++){
@@ -406,10 +412,10 @@ void MC::EnergyOfParticle(int ithBox, int ithSpecies, int index){
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += LJ_Pot(ithBox, ithSpecies, jthSpecies, index);
 		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "hs"){
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += HardSphere_Pot(ithBox, ithSpecies, jthSpecies, index);
-		//}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_ga"){ //EAM potential for Ga.
-			//tmp = EAMGA_Energy(index);
-			//box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
-			//box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_ga"){ //EAM potential for Ga.
+			tmp = EAMGA_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
 		}
 	}
 	box[ithBox].fluid[ithSpecies].particle[index].energy = box[ithBox].fluid[ithSpecies].particle[index].pairPotE;
@@ -526,42 +532,6 @@ void MC::MinimizeEnergy(void){
 			cout << endl;
 		}
 	}
-}
-void MC::PrintStats(int set){
-	cout << fixed;
-	cout << setprecision(5);
-	if (set < sim.nEquilSets) cout << "Equilibrium set: " << set << endl;
-	else cout << "Set: " << set << endl;
-	if (stats.nDisplacements > 0){
-		cout << "AcceptDispRatio; RegectDispRatio:\t";
-		cout << stats.acceptance*1./stats.nDisplacements << "; ";
-		cout << stats.rejection*1./stats.nDisplacements << endl;
-		if (set < sim.nEquilSets) cout << "Step size: " << sim.dr << endl;
-	}
-	if (sim.nVolAttempts > 0){
-		cout << "AcceptVolRatio; RejectVolRatio:\t";
-		cout << stats.acceptanceVol*1./stats.nVolChanges << "; ";
-		cout << stats.rejectionVol*1./stats.nVolChanges << endl;
-		if (set < sim.nEquilSets) cout << "Volume step size: " << sim.dv << endl;
-	}
-	//if (sim.exchangeProb > 0){
-		//cout << "AcceptInsertRatio; RejectInsertRatio:\t";
-		//cout << stats.acceptInsertion*1./stats.nExchanges << "; ";
-		//cout << stats.rejectInsertion*1./stats.nExchanges << endl;
-		//cout << "AcceptDeletRAtio; RejectDeletRatio:\t";
-		//cout << stats.acceptDeletion*1./stats.nExchanges << "; ";
-		//cout << stats.rejectDeletion*1./stats.nExchanges << endl;
-	//}
-	for (int i=0; i<thermoSys.nBoxes; i++){
-		if (box[i].nParts > 0){
-			cout << "Box " << box[i].name << ":" << endl;
-			cout << "\tNumParticles; BoxSize; Energy/Particle:\t";
-			cout << box[i].nParts << "; ";
-			cout << box[i].width[2] << "; ";
-			cout << box[i].energy/box[i].nParts << endl;
-		}
-	}
-	cout << endl;
 }
 void MC::ResetStats(void){
 	stats.acceptance = stats.rejection = 0;
@@ -710,7 +680,7 @@ void MC::SwapParticle(void){
 		tmp = 0;
 		for (int i=0; i<thermoSys.nSpecies; i++){
 			tmp += box[0].fluid[i].nParts;
-			if (rand < tmp){
+			if (rand <= tmp){
 				ithSpecies = i;
 				break;
 			}
@@ -765,53 +735,59 @@ void MC::SwapParticle(void){
 		}
 	}else{
 		stats.nSwaps++;
-		if (Random() < 0.5) {inBox = 0; outBox = 1;
-		}else {inBox = 1; outBox = 0;}
-		rand = int(Random()*box[inBox].nParts);
-		tmp = 0;
-		for (int i=0; i<thermoSys.nSpecies; i++){
-			tmp += box[inBox].fluid[i].nParts;
-			if (rand < tmp){
-				ithSpecies = i;
-				break;
-			}
+		if (Random() < 0.5){
+			inBox = 0;
+			outBox = 1;
+		}else{
+			inBox = 1;
+			outBox = 0;
 		}
-		inIndex = box[inBox].fluid[ithSpecies].nParts+1;
-		InsertParticle(inBox, ithSpecies, inIndex);
-		EnergyOfParticle(inBox, ithSpecies, inIndex);
-		inEnergy = box[inBox].fluid[ithSpecies].particle[inIndex].energy; // K
-		stats.widom[inBox][ithSpecies] += box[inBox].volume*exp(-inEnergy/thermoSys.temp)/(box[inBox].nParts+1); // Compute mu through Widom.
-		stats.widomInsertions++;
-		if (box[outBox].nParts == 0) return;
-		do{
-			outIndex = int(Random()*box[outBox].fluid[ithSpecies].nParts)+1;
-		}while(outIndex < box[outBox].fluid[ithSpecies].nParts);
-		EnergyOfParticle(outBox, ithSpecies, outIndex); //K
-		outEnergy = box[outBox].fluid[ithSpecies].particle[outIndex].energy; // K
-		deltaE = inEnergy-outEnergy;
-		arg = exp(-(deltaE+log(box[outBox].volume*(box[inBox].nParts+1)/(box[inBox].volume*box[outBox].nParts))*temp)/temp); // Acceptance criterion (for removing particle).
-		if (Random() < arg){
-			stats.acceptSwap++; // Accepted: Insert particle.
-			box[inBox].nParts++;
-			box[inBox].fluid[ithSpecies].nParts++;
-			manyBodyE = box[inBox].fluid[ithSpecies].particle[inIndex].manyBodyE;
-			pairPotE = 0.5*box[inBox].fluid[ithSpecies].particle[inIndex].pairPotE;
-			boxE = box[inBox].fluid[ithSpecies].particle[inIndex].boxE;
-			box[inBox].manyBodyE += manyBodyE; // K
-			box[inBox].pairPotE += pairPotE; // K
-			box[inBox].boxE += boxE; // K
-			box[inBox].energy += manyBodyE + pairPotE + boxE;
-			box[outBox].fluid[ithSpecies].particle[outIndex] = box[outBox].fluid[ithSpecies].particle[box[outBox].fluid[ithSpecies].nParts];
-			box[outBox].nParts--;
-			box[outBox].fluid[ithSpecies].nParts--;
-			manyBodyE = box[outBox].fluid[ithSpecies].particle[outIndex].manyBodyE;
-			pairPotE = 0.5*box[outBox].fluid[ithSpecies].particle[outIndex].pairPotE;
-			boxE = box[outBox].fluid[ithSpecies].particle[outIndex].boxE;
-			box[outBox].manyBodyE -= manyBodyE; // K
-			box[outBox].pairPotE -= pairPotE; // K
-			box[outBox].boxE -= boxE; // K
-			box[outBox].energy -= manyBodyE + pairPotE + boxE;
-		}else stats.rejectSwap++;
+		if (box[outBox].nParts > 0){
+			rand = int(Random()*box[inBox].nParts);
+			tmp = 0;
+			for (int i=0; i<thermoSys.nSpecies; i++){
+				tmp += box[inBox].fluid[i].nParts;
+				if (rand <= tmp){
+					ithSpecies = i;
+					break;
+				}
+			}
+			inIndex = box[inBox].fluid[ithSpecies].nParts+1;
+			InsertParticle(inBox, ithSpecies, inIndex);
+			EnergyOfParticle(inBox, ithSpecies, inIndex);
+			inEnergy = box[inBox].fluid[ithSpecies].particle[inIndex].energy; // K
+			stats.widom[inBox][ithSpecies] += box[inBox].volume*exp(-inEnergy/thermoSys.temp)/(box[inBox].nParts+1); // Compute mu through Widom.
+			stats.widomInsertions++;
+			do{
+				outIndex = int(Random()*box[outBox].fluid[ithSpecies].nParts)+1;
+			}while(outIndex < box[outBox].fluid[ithSpecies].nParts);
+			EnergyOfParticle(outBox, ithSpecies, outIndex); //K
+			outEnergy = box[outBox].fluid[ithSpecies].particle[outIndex].energy; // K
+			deltaE = inEnergy-outEnergy;
+			arg = exp(-(deltaE+log(box[outBox].volume*(box[inBox].nParts+1)/(box[inBox].volume*box[outBox].nParts))*temp)/temp); // Acceptance criterion (for removing particle).
+			if (Random() < arg){
+				stats.acceptSwap++; // Accepted: Insert particle.
+				box[inBox].nParts++;
+				box[inBox].fluid[ithSpecies].nParts++;
+				manyBodyE = box[inBox].fluid[ithSpecies].particle[inIndex].manyBodyE;
+				pairPotE = 0.5*box[inBox].fluid[ithSpecies].particle[inIndex].pairPotE;
+				boxE = box[inBox].fluid[ithSpecies].particle[inIndex].boxE;
+				box[inBox].manyBodyE += manyBodyE; // K
+				box[inBox].pairPotE += pairPotE; // K
+				box[inBox].boxE += boxE; // K
+				box[inBox].energy += manyBodyE + pairPotE + boxE;
+				box[outBox].fluid[ithSpecies].particle[outIndex] = box[outBox].fluid[ithSpecies].particle[box[outBox].fluid[ithSpecies].nParts];
+				box[outBox].nParts--;
+				box[outBox].fluid[ithSpecies].nParts--;
+				manyBodyE = box[outBox].fluid[ithSpecies].particle[outIndex].manyBodyE;
+				pairPotE = 0.5*box[outBox].fluid[ithSpecies].particle[outIndex].pairPotE;
+				boxE = box[outBox].fluid[ithSpecies].particle[outIndex].boxE;
+				box[outBox].manyBodyE -= manyBodyE; // K
+				box[outBox].pairPotE -= pairPotE; // K
+				box[outBox].boxE -= boxE; // K
+				box[outBox].energy -= manyBodyE + pairPotE + boxE;
+			}else stats.rejectSwap++;
+		}
 	}
 }
 // Performs Widom insertions to compute mu in each box.
@@ -854,7 +830,7 @@ void MC::ComputeChemicalPotential(void){
 			muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)*(box[0].fluid[0].nParts+1)/volume); //K
 			muExcess = -thermoSys.temp*log(insertionParam); //K
 		}
-	}else{
+	}else if (thermoSys.nBoxes > 1){
 		muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)); //K
 		for (int i=0; i<thermoSys.nSpecies; i++){
 			insertionParam = stats.widom[0][i]/stats.widomInsertions;
@@ -926,7 +902,7 @@ void MC::PrintRDF(void){
 			gofr[bin] /= dn_ideal;
 		}
 		//Write into the file.
-		outDirName << "output_" << thermoSys.nParts << "_" << thermoSys.temp << "K";
+		outDirName << "output_" << thermoSys.temp << "K";
 		outFileName << outDirName.str() << box[0].name << "/rdf_";
 		outFileName << fluid[ithSpecies].name << "-" << fluid[jthSpecies].name << ".dat";
 		rdfFile.open(outFileName.str());
@@ -943,7 +919,7 @@ void MC::PrintTrajectory(int set){
 	ostringstream outDirName, outFileName;
 	double tmp=0.0;
 
-	outDirName << "output_" << thermoSys.nParts << "_" << thermoSys.temp << "K";
+	outDirName << "output_" << thermoSys.temp << "K";
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		outFileName << outDirName.str() << "/" << box[i].name << "/trajectory.exyz";
 		if (set == 0) trajFile.open(outFileName.str());
@@ -971,7 +947,7 @@ void MC::PrintLog(int set){
 	ostringstream outDirName, outBoxName, outFileName;
 	double density, volume, ffEnergy, energy;
 
-	outDirName << "output_" << thermoSys.nParts << "_" << thermoSys.temp << "K";
+	outDirName << "output_" << thermoSys.temp << "K";
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		outFileName << outDirName.str() << "/" << box[i].name << "/simulation.log";
 		volume = box[i].volume; //AA^3
@@ -1009,6 +985,39 @@ void MC::PrintLog(int set){
 		outFileName.str(""); outFileName.clear();
 		logFile.clear();
 	}
+}
+void MC::PrintStats(int set){
+	cout << fixed;
+	cout << setprecision(5);
+	if (set < sim.nEquilSets) cout << "Equilibrium set: " << set << endl;
+	else cout << "Set: " << set << endl;
+	if (stats.nDisplacements > 0){
+		cout << "AcceptDispRatio; RegectDispRatio:\t";
+		cout << stats.acceptance*1./stats.nDisplacements << "; ";
+		cout << stats.rejection*1./stats.nDisplacements << endl;
+		if (set < sim.nEquilSets) cout << "Step size: " << sim.dr << endl;
+	}
+	if (sim.nVolAttempts > 0){
+		cout << "AcceptVolRatio; RejectVolRatio:\t";
+		cout << stats.acceptanceVol*1./stats.nVolChanges << "; ";
+		cout << stats.rejectionVol*1./stats.nVolChanges << endl;
+		if (set < sim.nEquilSets) cout << "Volume step size: " << sim.dv << endl;
+	}
+	if (sim.nSwapAttempts > 0){
+		cout << "AcceptSwapRatio; RejectSwapRatio:\t";
+		cout << stats.acceptSwap*1./stats.nSwaps << "; ";
+		cout << stats.rejectSwap*1./stats.nSwaps << endl;
+	}
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		//if (box[i].nParts > 0){
+			cout << "Box " << box[i].name << ":" << endl;
+			cout << "\tNumParticles; BoxSize; Energy/Particle:\t";
+			cout << box[i].nParts << "; ";
+			cout << box[i].width[2] << "; ";
+			cout << box[i].energy/box[i].nParts << endl;
+		//}
+	}
+	cout << endl;
 }
 
 double MC::NeighDistance(int ithBox, Particle ithPart, Particle jthPart){
@@ -1063,77 +1072,81 @@ double MC::LJ_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
 // Belashchenko, D.K., 2012.
 // Computer Simulation of the Properties of Liquid Metals: Gallium, Lead, and Bismuth.
 // Russ. J. Phys. Chem. A, 86, pp.779-790.
-//double* MC::EAMGA_Energy(int index){
-	//static double energy[2];
-	//double rij;
-	//double rho=0, phiLow=0;
-	//double eVToK = (801088317./5.0e27)/kb;
+double* MC::EAMGA_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
+	Particle ithPart, jthPart;
+	static double energy[2];
+	double rij, rcut;
+	double rho=0, phiLow=0;
+	double eVToK = (801088317./5.0e27)/kb;
 
-	//for (int j=1; j<=fluid.nParts; j++){
-		//if (j != index){
-			//rij = NeighDistance(index, j);
-			//if (rij < fluid.rcut){
-				//rho += eDens(rij);
-				//phiLow += PairPot(rij);
-			//}
-		//}
-	//}
-	//energy[0] = EmbPot(rho)*eVToK;
-	//energy[1] = phiLow*eVToK;
-	//return energy;
-//}
-//double MC::StepUnit(double radius, double leftLim, double rightLim){
-	//if (leftLim <= radius && radius < rightLim) return 1.;
-	//else return 0.;
-//}
-//double MC::EmbPot(double rho){
-	//double rhoIntervals[7] = {1.00000,  0.92000,  0.870000,  0.800000,  0.750000,  0.650000,  1.400000};
-	//double aValues[7]      = {0.00000, -1.91235, -1.904030, -1.897380, -1.883520, -1.852620, -1.822820};
-	//double bValues[7]      = {0.00000,  0.00000, -0.208000, -0.058000, -0.338000, -0.898000,  0.302000};
-	//double cValues[7]      = {0.00000,  1.30000, -1.500000,  2.000000,  5.600000, -6.000000,  2.000000};
-	//double phi = 0;
+	ithPart = box[ithBox].fluid[ithSpecies].particle[index];
+	rcut = fluid[ithSpecies].rcut[jthSpecies]; // AA
+	for (int j=1; j<=box[ithBox].fluid[jthSpecies].nParts; j++){
+		jthPart = box[ithBox].fluid[jthSpecies].particle[j];
+		if (ithPart != jthPart){
+			rij = NeighDistance(ithBox, ithPart, jthPart);
+			if (rij <= rcut){
+				rho += eDens(rij);
+				phiLow += PairPot(rij);
+			}
+		}
+	}
+	energy[0] = EmbPot(rho)*eVToK;
+	energy[1] = phiLow*eVToK;
+	return energy;
+}
+double MC::StepUnit(double radius, double leftLim, double rightLim){
+	if (leftLim <= radius && radius < rightLim) return 1.;
+	else return 0.;
+}
+double MC::EmbPot(double rho){
+	double rhoIntervals[7] = {1.00000,  0.92000,  0.870000,  0.800000,  0.750000,  0.650000,  1.400000};
+	double aValues[7]      = {0.00000, -1.91235, -1.904030, -1.897380, -1.883520, -1.852620, -1.822820};
+	double bValues[7]      = {0.00000,  0.00000, -0.208000, -0.058000, -0.338000, -0.898000,  0.302000};
+	double cValues[7]      = {0.00000,  1.30000, -1.500000,  2.000000,  5.600000, -6.000000,  2.000000};
+	double phi = 0;
 
-	//if (rhoIntervals[1] <= rho && rho <= rhoIntervals[6]) phi = aValues[1] + cValues[1]*(rho-rhoIntervals[0])*(rho-rhoIntervals[0]);
-	//for (int i=2; i<6; i++){
-		//if (rhoIntervals[i] <= rho && rho <= rhoIntervals[i-1]){
-			//phi = aValues[i] + bValues[i]*(rho-rhoIntervals[i-1]) + cValues[i]*(rho-rhoIntervals[i-1])*(rho-rhoIntervals[i-1]);
-			//break;
-		//}
-	//}
-	//if (rho <= rhoIntervals[5]){
-		//phi = (aValues[6] + bValues[6]*(rho-rhoIntervals[5]) + cValues[6]*(rho-rhoIntervals[5])*(rho-rhoIntervals[5])) * (2*rho/rhoIntervals[5]-(rho/rhoIntervals[5])*(rho/rhoIntervals[5]));
-	//}
-	//return phi;
-//}
-//double MC::eDens(double radius){
-	//double pValues[3] = {0, 2.24450, 1.2};
+	if (rhoIntervals[1] <= rho && rho <= rhoIntervals[6]) phi = aValues[1] + cValues[1]*(rho-rhoIntervals[0])*(rho-rhoIntervals[0]);
+	for (int i=2; i<6; i++){
+		if (rhoIntervals[i] <= rho && rho <= rhoIntervals[i-1]){
+			phi = aValues[i] + bValues[i]*(rho-rhoIntervals[i-1]) + cValues[i]*(rho-rhoIntervals[i-1])*(rho-rhoIntervals[i-1]);
+			break;
+		}
+	}
+	if (rho <= rhoIntervals[5]){
+		phi = (aValues[6] + bValues[6]*(rho-rhoIntervals[5]) + cValues[6]*(rho-rhoIntervals[5])*(rho-rhoIntervals[5])) * (2*rho/rhoIntervals[5]-(rho/rhoIntervals[5])*(rho/rhoIntervals[5]));
+	}
+	return phi;
+}
+double MC::eDens(double radius){
+	double pValues[3] = {0, 2.24450, 1.2};
 
-	//return pValues[1]*exp(-pValues[2]*radius);
-//}
-//double MC::PairPot(double radius){
-	//double rIntervals[7] = {0.0, 2.15, 2.75, 3.35, 4.00, 6.50, 8.30};
-	//double aValues[9][6] = {{0.0, -0.65052509307861e-01, -0.15576396882534e+00, -0.13794735074043e+00, 0.13303710147738e-01,  0.00000000000000e+00},
-							//{0.0, -0.32728102803230e+00, -0.16365580260754e-01,  0.78778542578220e-01, 0.59769893996418e-02,  0.00000000000000e+00},
-							//{0.0,  0.51590444127493e+01,  0.20955204046244e+00, -0.83622260891495e-01, 0.57411338894840e-01, -0.60454444423660e-02},
-							//{0.0,  0.90195221829217e+02, -0.97550604734748e+00, -0.44410858010987e+01, 0.19517888219051e+00, -0.13258585494287e+00},
-							//{0.0,  0.72322004859499e+03, -0.11625479189815e+02, -0.36415106938231e+02, 0.32162310059276e+00, -0.34988482891053e+00},
-							//{0.0,  0.27788989409594e+04, -0.58549935696765e+02, -0.13414583419234e+03, 0.30195698240893e+00, -0.45183606796559e+00},
-							//{0.0,  0.56037895713613e+04, -0.15186293377510e+03, -0.25239146992011e+03, 0.14850603977640e+00, -0.31733856650298e+00},
-							//{0.0,  0.57428084950480e+04, -0.19622924502226e+03, -0.23858760191913e+03, 0.36233874262589e-01, -0.11493645479281e+00},
-							//{0.0,  0.23685488320885e+04, -0.98789413798382e+02, -0.90270667293646e+02, 0.34984220138018e-02, -0.16768950999376e-01}};
-	//double phi=0;
+	return pValues[1]*exp(-pValues[2]*radius);
+}
+double MC::PairPot(double radius){
+	double rIntervals[7] = {0.0, 2.15, 2.75, 3.35, 4.00, 6.50, 8.30};
+	double aValues[9][6] = {{0.0, -0.65052509307861e-01, -0.15576396882534e+00, -0.13794735074043e+00, 0.13303710147738e-01,  0.00000000000000e+00},
+							{0.0, -0.32728102803230e+00, -0.16365580260754e-01,  0.78778542578220e-01, 0.59769893996418e-02,  0.00000000000000e+00},
+							{0.0,  0.51590444127493e+01,  0.20955204046244e+00, -0.83622260891495e-01, 0.57411338894840e-01, -0.60454444423660e-02},
+							{0.0,  0.90195221829217e+02, -0.97550604734748e+00, -0.44410858010987e+01, 0.19517888219051e+00, -0.13258585494287e+00},
+							{0.0,  0.72322004859499e+03, -0.11625479189815e+02, -0.36415106938231e+02, 0.32162310059276e+00, -0.34988482891053e+00},
+							{0.0,  0.27788989409594e+04, -0.58549935696765e+02, -0.13414583419234e+03, 0.30195698240893e+00, -0.45183606796559e+00},
+							{0.0,  0.56037895713613e+04, -0.15186293377510e+03, -0.25239146992011e+03, 0.14850603977640e+00, -0.31733856650298e+00},
+							{0.0,  0.57428084950480e+04, -0.19622924502226e+03, -0.23858760191913e+03, 0.36233874262589e-01, -0.11493645479281e+00},
+							{0.0,  0.23685488320885e+04, -0.98789413798382e+02, -0.90270667293646e+02, 0.34984220138018e-02, -0.16768950999376e-01}};
+	double phi=0;
 
-	//if (rIntervals[1] < radius && radius <= rIntervals[6]){
-		//for (int i=1; i<6; i++){
-			//for (int m=0; m<9; m++){
-				//phi += aValues[m][i] * pow((radius-rIntervals[i+1]),m) * StepUnit(radius, rIntervals[i], rIntervals[i+1]);
-			//}
-		//}
-	//}else if (rIntervals[0] < radius && radius <= rIntervals[1]){
-		//phi = 0.619588 - 51.86268*(2.15-radius) + 27.8*(exp(1.96*(2.15-radius))-1);
-	//}
-	//return phi;
-//}
+	if (rIntervals[1] < radius && radius <= rIntervals[6]){
+		for (int i=1; i<6; i++){
+			for (int m=0; m<9; m++){
+				phi += aValues[m][i] * pow((radius-rIntervals[i+1]),m) * StepUnit(radius, rIntervals[i], rIntervals[i+1]);
+			}
+		}
+	}else if (rIntervals[0] < radius && radius <= rIntervals[1]){
+		phi = 0.619588 - 51.86268*(2.15-radius) + 27.8*(exp(1.96*(2.15-radius))-1);
+	}
+	return phi;
+}
 // EAM Ga potential ^^^ //
 // ---------- Fluid-Fluid potentials ---------- //
 
@@ -1144,28 +1157,28 @@ double MC::LJ_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
 // Surf. Sci., 36(1), pp.317-352.
 // Steele 10-4-3 potential extended by Jason for multiple layers.
 // Domain of potential: z in [0,H], where H is the pore size.
-//double MC::SlitLJ(int index){
-	//Tools tls;
-	//double z, t1, t2, t3, t4;
-	//int nLayers = pore.nLayersPerWall;
-	//double sizeR = pore.width[2]*0.5; // AA
-	//double dens = pore.sfDensity; // AA^-2
-	//double eps = pore.sfEpsilon; // K
-	//double sig = pore.sfSigma; // AA
-	//double delta = pore.deltaLayers; // AA
-	//double usf = 0;
+double MC::SlitLJ(int ithBox, int ithSpecies, int index){
+	Tools tls;
+	double z, t1, t2, t3, t4;
+	int nLayers = box[ithBox].nLayersPerWall;
+	double sizeR = box[ithBox].width[2]*0.5; // AA
+	double dens = box[ithBox].solidDens; // AA^-2
+	double eps = box[ithBox].fluid[ithSpecies].epsilon[0]; // K
+	double sig = box[ithBox].fluid[ithSpecies].sigma[0]; // AA
+	double delta = box[ithBox].deltaLayers; // AA
+	double usf = 0;
 
-	//z = particle[index].z-sizeR;
-	//for (int i=0; i<nLayers; i++){
-		//t1 = tls.Pow(sig/(sizeR+i*delta+z),10);
-		//t2 = tls.Pow(sig/(sizeR+i*delta-z),10);
-		//t3 = tls.Pow(sig/(sizeR+i*delta+z),4);
-		//t4 = tls.Pow(sig/(sizeR+i*delta-z),4);
-		//usf += 0.2*(t1+t2)-0.5*(t3+t4);
-	//}
-	//usf *= 4.*pi*eps*dens*sig*sig; // K
-	//return usf;
-//}
+	z = box[ithBox].fluid[ithSpecies].particle[index].z-sizeR;
+	for (int i=0; i<nLayers; i++){
+		t1 = tls.Pow(sig/(sizeR+i*delta+z),10);
+		t2 = tls.Pow(sig/(sizeR+i*delta-z),10);
+		t3 = tls.Pow(sig/(sizeR+i*delta+z),4);
+		t4 = tls.Pow(sig/(sizeR+i*delta-z),4);
+		usf += 0.2*(t1+t2)-0.5*(t3+t4);
+	}
+	usf *= 4.*pi*eps*dens*sig*sig; // K
+	return usf;
+}
 // Paper:
 // Tjatjopoulos et al., 1988.
 // Molecule-Micropore Interaction Potentials.
@@ -1174,62 +1187,62 @@ double MC::LJ_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
 // Press, W.H., 2007.
 // Numerical recipes 3rd edition: The art of scientific computing.
 // Cambridge university press.
-//double MC::CylindricalLJ(int index){
-	//Tools tls;
-	//double yPos, zPos;
-	//double x, u1, u2, usf, rho;
-	//double sizeR = pore.width[2]*0.5; // AA
-	//double dens = pore.sfDensity; // AA^-2
-	//double eps = pore.sfEpsilon; // K
-	//double sig = pore.sfSigma; // AA
+double MC::CylindricalLJ(int ithBox, int ithSpecies, int index){
+	Tools tls;
+	double yPos, zPos;
+	double x, u1, u2, usf, rho;
+	double sizeR = box[ithBox].width[2]*0.5; // AA
+	double dens = box[ithBox].solidDens; // AA^-2
+	double eps = box[ithBox].fluid[ithSpecies].epsilon[0]; // K
+	double sig = box[ithBox].fluid[ithSpecies].sigma[0]; // AA
 
-	//yPos = particle[index].y - 0.5*pore.width[1];
-	//zPos = particle[index].z - 0.5*pore.width[2];
-	//rho = sqrt(tls.Pow(yPos,2) + tls.Pow(zPos,2));
-	//// Reducing units/
-	//dens *= sig*sig;
-	//sizeR /= sig;
-	//rho /= sig;
-	//x = sizeR-rho;
-	//u1 = 63. /32. * 1./(tls.Pow(x,10)*tls.Pow(2.0-x/sizeR,10)) * hypgeo(-4.5,-4.5,1.,tls.Pow(1-x/sizeR,2));
-	//u2 = 3. / (tls.Pow(x,4)*tls.Pow(2.0-x/sizeR,4)) * hypgeo(-1.5,-1.5,1.,tls.Pow(1.0-x/sizeR,2));
-	//usf = (u1-u2)*pi*pi*dens*eps; // K
-	//return usf;
-//}
+	yPos = box[ithBox].fluid[ithSpecies].particle[index].y - 0.5*box[ithBox].width[1];
+	zPos = box[ithBox].fluid[ithSpecies].particle[index].z - 0.5*box[ithBox].width[2];
+	rho = sqrt(tls.Pow(yPos,2) + tls.Pow(zPos,2));
+	// Reducing units/
+	dens *= sig*sig;
+	sizeR /= sig;
+	rho /= sig;
+	x = sizeR-rho;
+	u1 = 63. /32. * 1./(tls.Pow(x,10)*tls.Pow(2.0-x/sizeR,10)) * hypgeo(-4.5,-4.5,1.,tls.Pow(1-x/sizeR,2));
+	u2 = 3. / (tls.Pow(x,4)*tls.Pow(2.0-x/sizeR,4)) * hypgeo(-1.5,-1.5,1.,tls.Pow(1.0-x/sizeR,2));
+	usf = (u1-u2)*pi*pi*dens*eps; // K
+	return usf;
+}
 // Paper:
 // Baksh, M.S.A. and Yang, R.T., 1991.
 // Model for Spherical Cavity Radii and Potential Functions of Sorbates in Zeolites.
 // AIChE J., 37(6), pp.923-930.
-//double MC::SphericalLJ(int index){
-	//Tools tls;
-	//double xPos, yPos, zPos;
-	//double r, x, usf;
-	//double sizeR = pore.width[2]*0.5;
-	//double dens = pore.sfDensity;
-	//double eps = pore.sfEpsilon;
-	//double sig = pore.sfSigma;
-	//double u1=0, u2=0;
+double MC::SphericalLJ(int ithBox, int ithSpecies, int index){
+	Tools tls;
+	double xPos, yPos, zPos;
+	double r, x, usf;
+	double sizeR = box[ithBox].width[2]*0.5;
+	double dens = box[ithBox].solidDens;
+	double eps = box[ithBox].fluid[ithSpecies].epsilon[0];
+	double sig = box[ithBox].fluid[ithSpecies].sigma[0];
+	double u1=0, u2=0;
 
-	//xPos = particle[index].x - 0.5*pore.width[0];
-	//yPos = particle[index].y - 0.5*pore.width[1];
-	//zPos = particle[index].z - 0.5*pore.width[2];
-	//r = sqrt(tls.Pow(xPos,2) + tls.Pow(yPos,2) + tls.Pow(zPos,2));
-	//// Reducing units/
-	//dens *= sig*sig;
-	//sizeR /= sig;
-	//r /= sig;
-	//x = sizeR-r;
-	//for (int i=0; i<10; i++){
-		//u1 += 1. / tls.Pow(sizeR,i) / tls.Pow(x,10-i);
-		//u1 += tls.Pow(-1.0,i) / tls.Pow(sizeR,i) / tls.Pow(x-2.0*sizeR,10-i);
-		//if (i < 4){
-			//u2 += 1. / tls.Pow(sizeR,i) / tls.Pow(x,4-i);
-			//u2 += tls.Pow(-1.0,i) / tls.Pow(sizeR,i) / tls.Pow(x-2.0*sizeR,4-i);
-		//}
-	//}
-	//usf = (2./5.) * u1 - u2;
-	//usf *= 2.*pi*eps*dens; //K
-	//return usf;
-//}
+	xPos = box[ithBox].fluid[ithSpecies].particle[index].x - 0.5*box[ithBox].width[0];
+	yPos = box[ithBox].fluid[ithSpecies].particle[index].y - 0.5*box[ithBox].width[1];
+	zPos = box[ithBox].fluid[ithSpecies].particle[index].z - 0.5*box[ithBox].width[2];
+	r = sqrt(tls.Pow(xPos,2) + tls.Pow(yPos,2) + tls.Pow(zPos,2));
+	// Reducing units/
+	dens *= sig*sig;
+	sizeR /= sig;
+	r /= sig;
+	x = sizeR-r;
+	for (int i=0; i<10; i++){
+		u1 += 1. / tls.Pow(sizeR,i) / tls.Pow(x,10-i);
+		u1 += tls.Pow(-1.0,i) / tls.Pow(sizeR,i) / tls.Pow(x-2.0*sizeR,10-i);
+		if (i < 4){
+			u2 += 1. / tls.Pow(sizeR,i) / tls.Pow(x,4-i);
+			u2 += tls.Pow(-1.0,i) / tls.Pow(sizeR,i) / tls.Pow(x-2.0*sizeR,4-i);
+		}
+	}
+	usf = (2./5.) * u1 - u2;
+	usf *= 2.*pi*eps*dens; //K
+	return usf;
+}
 // ---------- Solid-Fluid potentials ---------- //
 

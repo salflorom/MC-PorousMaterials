@@ -41,8 +41,8 @@ class MC {
 		} stats;
 		struct Simulation{
 			double nSets, nEquilSets, nCyclesPerSet, printEvery;
-			double nSwapAttempts, nVolAttempts;
 			double dr, dv;
+			int nDispAttempts, nSwapAttempts, nVolAttempts;
 			int cycle, rdf[2];
 			string compute[3];
 		} sim;
@@ -121,7 +121,7 @@ class MC {
 		double HardSphere_Pot(int, int, int, int);
 		double LJ_Pot(int, int, int, int);
 		// EAM Ga potential vvvvv //
-		double* EAMGA_Pot(int);
+		double* EAMGA_Pot(int, int, int, int);
 		double StepUnit(double, double, double);
 		double EmbPot(double);
 		double eDens(double);
@@ -130,9 +130,9 @@ class MC {
 		// Fluid-Fluid potentials //
 
 		// Solid-Fluid potentials //
-		double SlitLJ(int);
-		double CylindricalLJ(int);
-		double SphericalLJ(int);
+		double SlitLJ(int, int, int);
+		double CylindricalLJ(int, int, int);
+		double SphericalLJ(int, int, int);
 		// Solid-Fluid potentials //
 /* **************************************************************************** */
 };

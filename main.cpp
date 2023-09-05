@@ -17,7 +17,7 @@ int main(int argc, char** argv){
 	srand((unsigned)time(NULL)); //seed
 	string inFileName;
 	int nSets, nEquilSets, nCyclesPerSet, printEvery;
-	int nParts, nVolAttempts, nSwapAttempts;
+	int nDispAttempts, nVolAttempts, nSwapAttempts;
 	int* moves;
 	double rand;
 	MC mc;
@@ -32,7 +32,7 @@ int main(int argc, char** argv){
 	nCyclesPerSet = mc.GetNCyclesPerSet();
 	printEvery = mc.GetPrintEvery();
 	moves = mc.GetMCMoves();
-	nParts = moves[0];
+	nDispAttempts = moves[0];
 	nVolAttempts = moves[1];
 	nSwapAttempts = moves[2];
 	mc.MinimizeEnergy();
@@ -42,10 +42,10 @@ int main(int argc, char** argv){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
 		for (int cycle=1; cycle<=nCyclesPerSet; cycle++){
-			rand = mc.Random() * (nParts + nVolAttempts + nSwapAttempts);
-			if (rand <= nParts) mc.MoveParticle(); //Try displacement.
-			else if (rand <= nParts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
-			else if (rand <= nParts + nVolAttempts + nSwapAttempts) mc.SwapParticle(); //Try swap.
+			rand = int(mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts));
+			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.
+			else if (rand <= nDispAttempts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
+			else if (rand <= nDispAttempts + nVolAttempts + nSwapAttempts) mc.SwapParticle(); //Try swap.
 			if (set > nEquilSets){
 				mc.ComputeWidom();
 				mc.ComputeRDF();

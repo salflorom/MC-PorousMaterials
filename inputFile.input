@@ -13,7 +13,7 @@ ExternalTemperature 87.3; #K
 
 FluidName Ar;
 MolarMass 39.948; #g/mol
-#ChemicalPotential ... #K
+ChemicalPotential -1141.3790680498848; #K
 
 #Ga Ga VdWPotential eam_ga;
 #Ga Ga sigma 2.61; #Angstrom
@@ -31,26 +31,29 @@ Ar Ar rcut 17; #Angstrom
 #Ga Ar rcut 10; #Angstrom
 
 BoxName Box0;
-Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
-#SurfaceDensity 0.153; #Angstrom^-2
+Geometry Cylinder; #Sphere, Cylinder, Slit, Bulk.
+SurfaceDensity 0.153; #Angstrom^-2
 #NLayersPerWall 1;
 #DistanceBetweenLayers 3.35; #Angstrom
-Size 34.31525563577814; #Angstrom
+#Size 34.31525563577814; #Angstrom
+#Size 16.8013425;
+Size 30;
 
-BoxName Box1;
-Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
-Size 34.31525563577814; #Angstrom
+#BoxName Box1;
+#Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
+#Size 34.31525563577814; #Angstrom
 
-#Box0 Ar sigma 3; #Angstrom
-#Box0 Ar epsilon 171.24; #K
-#Box0 Ar VdWPotential LJ; #LJ or None (no solid-fluid interaction).
-Box0 Ar NumberOfParticles 428;
-Box1 Ar NumberOfParticles 428;
+Box0 Ar sigma 3; #Angstrom
+Box0 Ar epsilon 171.24; #K
+Box0 Ar VdWPotential LJ; #LJ or None (no solid-fluid interaction).
+Box0 Ar NumberOfParticles 1;
+#Box1 Ar NumberOfParticles 300;
 
 #SampleRDF Ar Ar; Check!
 
-NVolumeAttempts 2; #Advice: Set it to the num. of boxes.
-NSwapAttempts 856; #Advice: Set it to the total num. of particles.
+NDisplacementAttempts 250; #Advice: Set it to the num. of boxes.
+#NVolumeAttempts 1; #Advice: Set it to the num. of boxes.
+NSwapAttempts 250; #Advice: Set it to the total num. of particles.
 
 #EoS
 
