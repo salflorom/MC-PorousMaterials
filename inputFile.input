@@ -2,8 +2,57 @@
 
 EquilibriumSets 5e1;
 ProductionSets 1e5;
-StepsPerSet 1e2;
+CyclesPerSet 1e3;
 PrintEveryNSets 1e0;
+
+ExternalTemperature 87.3; #K
+#ExternalPressure 1.5e5; #Pa
+
+#FluidName Ga;
+#MolarMass 69.723; #g/mol
+
+FluidName Ar;
+MolarMass 39.948; #g/mol
+#ChemicalPotential ... #K
+
+#Ga Ga VdWPotential eam_ga;
+#Ga Ga sigma 2.61; #Angstrom
+#Ga Ga epsilon 1852; #K
+#Ga Ga rcut 8.3; #Angstrom
+
+Ar Ar VdWPotential LJ;
+Ar Ar sigma 3.405; #Angstrom
+Ar Ar epsilon 119.6; #K
+Ar Ar rcut 17; #Angstrom
+
+#Ga Ar VdWPotential LJ;
+#Ga Ar sigma 3; #Angstrom
+#Ga Ar epsilon 800; #K
+#Ga Ar rcut 10; #Angstrom
+
+BoxName Box0;
+Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
+#SurfaceDensity 0.153; #Angstrom^-2
+#NLayersPerWall 1;
+#DistanceBetweenLayers 3.35; #Angstrom
+Size 34.31525563577814; #Angstrom
+
+BoxName Box1;
+Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
+Size 34.31525563577814; #Angstrom
+
+#Box0 Ar sigma 3; #Angstrom
+#Box0 Ar epsilon 171.24; #K
+#Box0 Ar VdWPotential LJ; #LJ or None (no solid-fluid interaction).
+Box0 Ar NumberOfParticles 428;
+Box1 Ar NumberOfParticles 428;
+
+#SampleRDF Ar Ar; Check!
+
+NVolumeAttempts 2; #Advice: Set it to the num. of boxes.
+NSwapAttempts 856; #Advice: Set it to the total num. of particles.
+
+#EoS
 
 #ExternalTemperature 87.3; #K
 ##ExternalPressure 101302.1424862485; #Pa
@@ -25,23 +74,4 @@ PrintEveryNSets 1e0;
 	##NLayersPerWall 1;
 	##DistanceBetweenLayers 3.35; #Angstrom
 	#PoreSize 30; #Angstrom
-
-ExternalTemperature 1273; #K
-ExternalPressure 1-6; #Pa
-FluidName Ga;
-	NumberOfParticles 250;
-	Density 6.103; #g/cm^3
-	MolarMass 69.723; #g/mol
-	VdWPotential eam_ga;
-	sigma_ff 2.61; #Angstrom
-	epsilon_ff 1852; #K
-	Rcut 8.3; #Angstrom
-
-SampleRDF Yes;
-
-DisplacementProbability 0.5;
-#ChangeVolumeProbability 0.5;
-#ExchangeProbability 0.5;
-
-#EoS
 

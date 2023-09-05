@@ -6,11 +6,12 @@
 #include <string>
 #include <cstdlib>
 #include <cmath>
-#include <vector>
 #include <random>
 
-#define NBINS 500
-#define MAXPART 99999 //Max. num. of particles.
+#define NBINS 200
+#define MAXPART 9999 //Max. num. of particles. 0th part. is to save old config.
+#define MAXSPECIES 2 //Max. num. of species.
+#define MAXBOX 2 //Max. num. of boxes. 0th box is to save old comfiguration.
 #define pi M_PI
 #define kb 1.380649e-23 // J/K
 #define na 6.02214076e23 // mol^-1
@@ -20,61 +21,6 @@ using namespace std;
 
 /* **************************************************************************** */
 class MC {
-/* **************************************************************************** */
-	public:
-/* **************************************************************************** */
-		MC(void);
-		string OutputDirectory(bool createDir);
-		void ReadInputFile(string inFileName);
-		void ResetStats(void);
-		void PrintParams(void);
-		void InsertParticle(int);
-		void InitialConfig(void);
-		void MinimizeEnergy(void);
-		void AdjustMCMoves(void);
-		void MoveParticle(void);
-		void ChangeVolume(void);
-		void RescaleCenterOfMass(double initBoxWidth, double finalBoxWidth);
-		void ExchangeParticle(void);
-		void PBC(int index);
-		void ComputeRDF(void);
-		void PrintRDF(void);
-		void Metropolis(int index);
-		void CreateEXYZ(int step);
-		void CreateLogFile(int step);
-		void PrintStats(int step);
-		void ComputeWidom(void);
-		void ComputeChemicalPotential(void);
-		void EnergyOfParticle(int index);
-		double Random(void){return dis(engine);} //random num. in the interval [0,1).
-		double ComputeVolume(void);
-		double ComputeBoxWidth(double volume);
-		double* SystemEnergy(void);
-		double NeighDistance(int i, int j);
-
-		// Fluid-Fluid potentials //
-		double LJ_Energy(int i, int j);
-		// EAM Ga potential vvvvv //
-		double* EAMGA_Energy(int index);
-		double StepUnit(double radius, double leftLim, double rightLim);
-		double EmbPot(double rho);
-		double eDens(double radius);
-		double PairPot(double radius);
-		// EAM Ga potential ^^^^^ //
-		// Fluid-Fluid potentials //
-
-		// Solid-Fluid potentials //
-		double SlitLJ(int index);
-		double CylindricalLJ(int index);
-		double SphericalLJ(int index);
-		// Solid-Fluid potentials //
-
-		double* GetMCMoveProbabilities(void);
-		int GetNSets(void){return int(sim.nSets);}
-		int GetNEquilSets(void){return int(sim.nEquilSets);}
-		int GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
-		int GetPrintEvery(void){return int(sim.printEvery);}
-		string* GetCompute(void){return sim.compute;}
 /* **************************************************************************** */
 	protected:
 /* **************************************************************************** */
@@ -89,37 +35,105 @@ class MC {
 		struct Stats{
 			int acceptance, rejection, nDisplacements;
 			int acceptanceVol, rejectionVol, nVolChanges;
-			int acceptInsertion, rejectInsertion;
-			int acceptDeletion, rejectDeletion, nExchanges;
+			int acceptSwap, rejectSwap, nSwaps;
 			int widomInsertions;
-			double binWidth, widom, rdf[NBINS+1];
+			double binWidth, widom[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
-			string rdf, compute[3];
+			double nSets, nEquilSets, nCyclesPerSet, printEvery;
+			double nSwapAttempts, nVolAttempts;
 			double dr, dv;
-			double nSets, nEquilSets, nStepsPerSet, printEvery;
-			double displaceProb, exchangeProb, volumeProb;
-			double systemEnergy, deltaParticleEnergy;
-			int step;
+			int cycle, rdf[2];
+			string compute[3];
 		} sim;
-		struct FrameWork{
-			string name, sfPot, geometry;
-			bool PBC[3];
-			double boxWidth[3];
-			double sfEnergy, deltasfEnergy;
-			double sfDensity, sfEpsilon, sfSigma, deltaLayers;
-			int nLayersPerWall;
-		} pore;
-		struct Fluid{
-			string name, vdwPot;
-			double temp, molarMass, dens, extPress, mu;
-			double rcut, sigma, epsilon;
-			double ffEnergy, deltaffManybody, deltaffPairPot;
-			int nParts;
-		} fluid;
 		struct Particle{
 			double x, y, z;
-		} part[MAXPART];
+			double energy, manyBodyE, pairPotE, boxE; // //Particle energy.
+			bool operator!=(Particle bPart){
+				if ((this->x != bPart.x) || (this->y != bPart.y) || (this->z != bPart.z)){
+					return true;
+				}else return false;
+			}
+		};
+		struct Fluid{
+			string name;
+			string vdwPot[MAXSPECIES];
+			int nParts;
+			double molarMass, mu, muEx;
+			double sigma[MAXSPECIES], epsilon[MAXSPECIES], rcut[MAXSPECIES];
+			//Energy of the ith species in the jth box (ignoring interactions with the box).
+			Particle particle[MAXPART];
+		} fluid[MAXSPECIES]; //For single species properties.
+		struct Box{
+			string name, geometry, vdwPot; //pot: solid-fluid potential.
+			int nParts;
+			bool PBC[3];
+			double width[3];
+			double solidDens, volume, deltaLayers;
+			double energy, manyBodyE, pairPotE, boxE; // Energy of the box.
+			int nLayersPerWall;
+			Fluid fluid[MAXSPECIES]; //For solid-species properties.
+		} box[MAXBOX];
+		struct ThermodynamicSystem{
+			double temp, volume, press;
+			int nBoxes, nSpecies, nParts;
+		} thermoSys;
+/* **************************************************************************** */
+	public:
+/* **************************************************************************** */
+		MC(void);
+		void OutputDirectory(void);
+		void ReadInputFile(string);
+		void ResetStats(void);
+		void PrintParams(void);
+		void InsertParticle(int, int, int);
+		void InitialConfig(void);
+		void MinimizeEnergy(void);
+		void AdjustMCMoves(void);
+		void MoveParticle(void);
+		void ChangeVolume(void);
+		void RescaleCenterOfMass(Box, Box&);
+		void SwapParticle(void);
+		void PBC(int, Particle&);
+		void ComputeRDF(void);
+		void PrintRDF(void);
+		void Metropolis(int);
+		void PrintTrajectory(int);
+		void PrintLog(int);
+		void PrintStats(int);
+		void ComputeWidom(void);
+		void ComputeChemicalPotential(void);
+		void EnergyOfParticle(int, int, int);
+		double Random(void){return dis(engine);} //random num. in the interval [0,1).
+		double ComputeVolume(Box);
+		double ComputeBoxWidth(Box, double);
+		void BoxEnergy(int);
+
+		int* GetMCMoves(void);
+		int GetNSets(void){return int(sim.nSets);}
+		int GetNEquilSets(void){return int(sim.nEquilSets);}
+		int GetNCyclesPerSet(void){return int(sim.nCyclesPerSet);}
+		int GetPrintEvery(void){return int(sim.printEvery);}
+		string* GetCompute(void){return sim.compute;}
+
+		double NeighDistance(int, Particle, Particle);
+		// Fluid-Fluid potentials //
+		double HardSphere_Pot(int, int, int, int);
+		double LJ_Pot(int, int, int, int);
+		// EAM Ga potential vvvvv //
+		double* EAMGA_Pot(int);
+		double StepUnit(double, double, double);
+		double EmbPot(double);
+		double eDens(double);
+		double PairPot(double);
+		// EAM Ga potential ^^^^^ //
+		// Fluid-Fluid potentials //
+
+		// Solid-Fluid potentials //
+		double SlitLJ(int);
+		double CylindricalLJ(int);
+		double SphericalLJ(int);
+		// Solid-Fluid potentials //
 /* **************************************************************************** */
 };
 /* **************************************************************************** */

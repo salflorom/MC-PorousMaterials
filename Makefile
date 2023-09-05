@@ -1,6 +1,6 @@
 # Compilation of MC-Integrated
 CC = g++
-CFLAGS = -g -Wall -Wextra -Wshadow -Wconversion -Wunreachable-code -O3 -mcmodel=medium
+CFLAGS = -g -Wall -Wextra -Wshadow -Wconversion -Wunreachable-code -O3 -mcmodel=medium -fmax-errors=1 -std=c++17
 OBJECTS = MC.o main.o
 PROG = mcexecutable
 all: $(PROG)
