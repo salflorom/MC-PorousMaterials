@@ -67,9 +67,9 @@ class MC {
 		struct Box{
 			string name, geometry, vdwPot; //pot: solid-fluid potential.
 			int nParts;
-			bool PBC[3];
+			bool fix, PBC[3];
 			double width[3];
-			double solidDens, volume, deltaLayers;
+			double solidDens, volume, deltaLayers, maxRcut;
 			double energy, manyBodyE, pairPotE, boxE; // Energy of the box.
 			int nLayersPerWall;
 			Fluid fluid[MAXSPECIES]; //For solid-species properties.

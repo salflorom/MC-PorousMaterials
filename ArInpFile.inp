@@ -1,0 +1,46 @@
+# Input script for running MC simulations.
+
+EquilibriumSets 5e1;
+ProductionSets 1e4;
+CyclesPerSet 1e3;
+PrintEveryNSets 1e0;
+
+ExternalTemperature 87.3; #K
+#ExternalPressure 50651.07124312425; #Pa
+
+FluidName CH4;
+MolarMass 16.04; #g/mol
+ChemicalPotential -772.5259117618194; #K
+
+CH4 CH4 VdWPotential LJ;
+CH4 CH4 sigma 3.73; #Angstrom
+CH4 CH4 epsilon 148.0; #K
+CH4 CH4 rcut 18.65; #Angstrom
+
+BoxName Box0;
+Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
+#SurfaceDensity 0.153; #Angstrom^-2
+#NLayersPerWall 3;
+#DistanceBetweenLayers 3.35; #Angstrom
+Size 40; #Angstrom
+#FixVolume;
+
+#BoxName Box1;
+#Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
+#Size 50; #Angstrom
+
+#Box0 CH4 sigma 3.565; #Angstrom
+#Box0 CH4 epsilon 64.374; #K
+#Box0 CH4 VdWPotential LJ; #LJ or None (no solid-fluid interaction).
+Box0 CH4 NumberOfParticles 0;
+
+#Box1 CH4 NumberOfParticles 3000;
+
+#SampleRDF CH4 CH4; Check!
+
+NDisplacementAttempts 3000; #Advice: Set it to the total num. of particles.
+#NVolumeAttempts 1; #Advice: Set it to the num. of boxes.
+NSwapAttempts 3000; #Advice: Set it to the total num. of particles.
+
+#EoS
+

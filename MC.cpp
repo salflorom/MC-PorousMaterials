@@ -65,6 +65,8 @@ MC::MC(void){
 		box[i].pairPotE = 0.;
 		box[i].boxE = 0.;
 		box[i].energy = 0.;
+		box[i].maxRcut = 0.;
+		box[i].fix = false;
 	}
 	for (i=0; i<MAXSPECIES; i++){
 		fluid[i].name = "";
@@ -126,7 +128,8 @@ void MC::ReadInputFile(string inFileName){
 		}else if (commands[0] == "surfacedensity") {box[thermoSys.nBoxes-1].solidDens = stod(commands[1]); // AA^-2
 		}else if (commands[0] == "nlayersperwall") {box[thermoSys.nBoxes-1].nLayersPerWall = stoi(commands[1]);
 		}else if (commands[0] == "distancebetweenlayers") {box[thermoSys.nBoxes-1].deltaLayers = stod(commands[1]);
-		}else if (commands[0] == "size") {box[thermoSys.nBoxes-1].width[2] = stod(commands[1]);} // AA. width[2] (z axis) always keeps for pore size.
+		}else if (commands[0] == "size") {box[thermoSys.nBoxes-1].width[2] = stod(commands[1]); // AA. width[2] (z axis) always keeps for pore size.
+		}else if (commands[0] == "fixvolume") {box[thermoSys.nBoxes-1].fix = true;} // AA. Used only for Gibbs ensemble.
 		// Interaction parameters.
 		else if (commands[2] == "vdwpotential"){
 			ithBox = tls.FindIndex(box, thermoSys.nBoxes, commands[0]);
@@ -175,6 +178,7 @@ void MC::ReadInputFile(string inFileName){
 		for (j=i; j<thermoSys.nSpecies; j++) if (maxRcut < fluid[i].rcut[j]) maxRcut = fluid[i].rcut[j];
 	}
 	for (i=0; i<thermoSys.nBoxes; i++){
+		box[i].maxRcut = maxRcut;
 		if (box[i].geometry == "sphere") {box[i].width[0] = box[i].width[1] = box[i].width[2];
 		}else if (box[i].geometry == "cylinder"){
 			box[i].width[0] = 2*maxRcut; // PBC along x axis.
@@ -240,7 +244,7 @@ void MC::PrintParams(void){
 	for (i=0; i<thermoSys.nSpecies; i++){
 		cout << "Species " << i << ": " << fluid[i].name << endl;
 		cout << "\tMolar mass (g/mol): " << fluid[i].molarMass << endl;
-		if (fluid[i].mu = 0) cout << "\tChemical potential (K): " << fluid[i].mu << endl;
+		if (fluid[i].mu != 0) cout << "\tChemical potential (K): " << fluid[i].mu << endl;
 	}
 	cout << endl;
 
@@ -265,6 +269,7 @@ void MC::PrintParams(void){
 		if (box[i].nLayersPerWall > 1) cout << "\tLayers per wall: " << box[i].nLayersPerWall << endl;
 		if (box[i].deltaLayers > 0) cout << "\tDistance between layers (AA): " << box[i].deltaLayers << endl;
 		cout << "\tInitial number of particles: " << box[i].nParts << endl;
+		if (box[i].fix) cout << "\tVolume fixed." << endl;
 	}
 	cout << endl;
 
@@ -462,7 +467,7 @@ void MC::MoveParticle(void){
 	tmp = 0;
 	for (i=0; i<thermoSys.nBoxes; i++){
 		tmp += box[i].nParts;
-		if (rand < tmp){
+		if (rand <= tmp){
 			ithBox = i;
 			break;
 		}
@@ -471,7 +476,7 @@ void MC::MoveParticle(void){
 	tmp = 0;
 	for (i=0; i<thermoSys.nSpecies; i++){
 		tmp += box[ithBox].fluid[i].nParts;
-		if (rand < tmp){
+		if (rand <= tmp){
 			ithSpecies = i;
 			break;
 		}
@@ -600,41 +605,43 @@ void MC::RescaleCenterOfMass(Box oldBox, Box& newBox){
 // Note 2: For NPT ensemble, it only works in box 1.
 // Note 3: For Gibbs ensemble, it only works with 2 boxes.
 void MC::ChangeVolume(void){
+	Box oldBox0, oldBox1;
+	int ithBox;
 	double deltaE0, deltaE1;
 	double logNewVol, deltaVol0, deltaVol1;
 	double arg0, arg1;
-	double extPress;
-	Box oldBox0, oldBox1;
+	double extPress = thermoSys.press/kb*1e-30; // K/AA^3
 
 	stats.nVolChanges++;
-	if (thermoSys.nBoxes == 1){
-		extPress = thermoSys.press/kb*1e-30; // K/AA^3
+	if (extPress > 0){ // NPT or Gibbs-NPT ensemble.
 		// Record current config.
-		oldBox0 = box[0]; // Record old information.
-		logNewVol = log(box[0].volume) + (Random()-0.5)*sim.dv; //Perform volume change step.
-		box[0].volume = exp(logNewVol);
-		RescaleCenterOfMass(oldBox0, box[0]); //Rescale to trial config.
+		do{
+			ithBox = round(Random()*thermoSys.nBoxes);
+		}while (box[ithBox].fix);
+		oldBox0 = box[ithBox]; // Record old information.
+		logNewVol = log(box[ithBox].volume) + (Random()-0.5)*sim.dv; //Perform volume change step.
+		box[ithBox].volume = exp(logNewVol);
+		RescaleCenterOfMass(oldBox0, box[ithBox]); //Rescale to trial config.
 		// Set box sizes according to trial volume.
 		//if (pore.geometry == "sphere") pore.width[0] = pore.width[1] = pore.width[2] = finalBoxWidth;
 		//else if (pore.geometry == "cylinder") pore.width[1] = pore.width[2] = finalBoxWidth;
 		//else if (pore.geometry == "slit") pore.width[2] = finalBoxWidth;
 		//else pore.width[0] = pore.width[1] = pore.width[2] = finalBoxWidth;
-		box[0].width[2] = ComputeBoxWidth(box[0], box[0].volume);
-		box[0].width[0] = box[0].width[1] = box[0].width[2];
+		box[ithBox].width[2] = ComputeBoxWidth(box[ithBox], box[ithBox].volume);
+		box[ithBox].width[0] = box[ithBox].width[1] = box[ithBox].width[2];
 		// Compute trial energy.
-		BoxEnergy(0);
-		deltaE0 = box[0].energy-oldBox0.energy;
-		deltaVol0 = box[0].volume-oldBox0.volume;
-		arg0 = -(deltaE0 + extPress*deltaVol0 - (box[0].nParts+1)*log(box[0].volume/oldBox0.volume)*thermoSys.temp);
-		if (Random() > exp(arg0/thermoSys.temp)){ //Rejected trial move.
+		BoxEnergy(ithBox);
+		deltaE0 = box[ithBox].energy-oldBox0.energy;
+		deltaVol0 = box[ithBox].volume-oldBox0.volume;
+		arg0 = deltaE0 + extPress*deltaVol0 - (box[ithBox].nParts+1)*log(box[ithBox].volume/oldBox0.volume)*thermoSys.temp;
+		if (Random() > exp(-arg0/thermoSys.temp)){ //Rejected trial move.
 			stats.rejectionVol++;
-			box[0] = oldBox0;
+			box[ithBox] = oldBox0;
 		}else{ // Accepted trial move. Keep trial config.
 			stats.acceptanceVol++;
-			thermoSys.volume = box[0].volume;
+			thermoSys.volume += deltaVol0;
 		}
-	}else{
-		// Record current configr
+	}else{ // Gibbs-NVT ensemble.
 		oldBox0 = box[0]; // Record old information.
 		oldBox1 = box[1];
 		logNewVol = log(box[0].volume/box[1].volume) + (Random()-0.5)*sim.dv; //Perform volume change step.
@@ -649,18 +656,22 @@ void MC::ChangeVolume(void){
 		box[1].width[0] = box[1].width[1] = box[1].width[2];
 		// Compute trial energy.
 		BoxEnergy(0);
-		deltaE0 = box[0].energy-oldBox0.energy;
-		deltaVol0 = box[0].volume-oldBox0.volume;
-		arg0 = -(deltaE0 + extPress*deltaVol0 - (box[0].nParts+1)*log(box[0].volume/oldBox0.volume)*thermoSys.temp);
 		BoxEnergy(1);
+		deltaE0 = box[0].energy-oldBox0.energy;
 		deltaE1 = box[1].energy-oldBox1.energy;
-		deltaVol1 = box[1].volume-oldBox1.volume;
-		arg1 = -(deltaE1 + extPress*deltaVol1 - (box[1].nParts+1)*log(box[1].volume/oldBox1.volume)*thermoSys.temp);
-		if (Random() > exp((arg0+arg1)/thermoSys.temp)){ //Rejected trial move.
+		arg0 = deltaE0 + (box[0].nParts+1)*log(box[0].volume/oldBox0.volume)*thermoSys.temp;
+		arg1 = deltaE1 + (box[1].nParts+1)*log(box[1].volume/oldBox1.volume)*thermoSys.temp;
+		if (Random() > exp(-(arg0+arg1)/thermoSys.temp)){ //Rejected trial move.
 			stats.rejectionVol++;
 			box[0] = oldBox0;
 			box[1] = oldBox1;
 		}else stats.acceptanceVol++; // Accepted trial move. Keep trial config.
+	}
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		if (box[i].geometry == "bulk" && box[i].width[2] < box[i].maxRcut){
+			cout << "Warning: Box surpassed the minimum allowed size: ";
+			cout << box[i].maxRcut << endl;
+		}
 	}
 }
 // Performs MC trial move: change of volume.
@@ -712,9 +723,7 @@ void MC::SwapParticle(void){
 		}else if (box[0].nParts > 0){ // Try removing particle (only if there are particles in the box).
 			stats.nSwaps++;
 			// Select random particle.
-			do{
-				outIndex = int(Random()*box[0].fluid[ithSpecies].nParts)+1;
-			}while(outIndex < box[0].fluid[ithSpecies].nParts);
+			outIndex = int(Random()*(box[0].fluid[ithSpecies].nParts)+1);
 			EnergyOfParticle(0, ithSpecies, outIndex); //K
 			outEnergy = box[0].fluid[ithSpecies].particle[outIndex].energy; // K
 			arg = box[0].nParts*exp(outEnergy/thermoSys.temp)/(zz*box[0].volume); // Acceptance criterion (for removing particle).
@@ -733,7 +742,7 @@ void MC::SwapParticle(void){
 				box[0].energy -= manyBodyE + pairPotE + boxE;
 			}else stats.rejectSwap++;
 		}
-	}else{
+	}else{ // Gibbs ensemble.
 		stats.nSwaps++;
 		if (Random() < 0.5){
 			inBox = 0;
@@ -758,14 +767,12 @@ void MC::SwapParticle(void){
 			inEnergy = box[inBox].fluid[ithSpecies].particle[inIndex].energy; // K
 			stats.widom[inBox][ithSpecies] += box[inBox].volume*exp(-inEnergy/thermoSys.temp)/(box[inBox].nParts+1); // Compute mu through Widom.
 			stats.widomInsertions++;
-			do{
-				outIndex = int(Random()*box[outBox].fluid[ithSpecies].nParts)+1;
-			}while(outIndex < box[outBox].fluid[ithSpecies].nParts);
+			outIndex = int(Random()*box[outBox].fluid[ithSpecies].nParts + 1);
 			EnergyOfParticle(outBox, ithSpecies, outIndex); //K
 			outEnergy = box[outBox].fluid[ithSpecies].particle[outIndex].energy; // K
 			deltaE = inEnergy-outEnergy;
-			arg = exp(-(deltaE+log(box[outBox].volume*(box[inBox].nParts+1)/(box[inBox].volume*box[outBox].nParts))*temp)/temp); // Acceptance criterion (for removing particle).
-			if (Random() < arg){
+			arg = deltaE+log(box[outBox].volume*(box[inBox].nParts+1)/(box[inBox].volume*box[outBox].nParts))*temp; // Acceptance criterion (for removing particle).
+			if (Random() < exp(-arg/temp)){
 				stats.acceptSwap++; // Accepted: Insert particle.
 				box[inBox].nParts++;
 				box[inBox].fluid[ithSpecies].nParts++;

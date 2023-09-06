@@ -42,7 +42,7 @@ int main(int argc, char** argv){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
 		for (int cycle=1; cycle<=nCyclesPerSet; cycle++){
-			rand = int(mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts));
+			rand = mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts);
 			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.
 			else if (rand <= nDispAttempts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
 			else if (rand <= nDispAttempts + nVolAttempts + nSwapAttempts) mc.SwapParticle(); //Try swap.
