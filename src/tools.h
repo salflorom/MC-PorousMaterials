@@ -1,19 +1,20 @@
-#ifndef _OPERATIONS_H_
-#define _OPERATIONS_H_
+#ifndef _TOOLS_H_
+#define _TOOLS_H_
 
-#include <string>
-#include <fstream>
-#include <memory>
-#include <stdexcept>
+#include <string> // string, getline, c_str
+#include <cstring> // strlen
+#include <sstream> // stringstream
+
+#include "MC.h"
 
 using namespace std;
 
 /* **************************************************************************** */
-class Operations {
+class Tools {
 /* **************************************************************************** */
 	public:
 /* **************************************************************************** */
-		Operations(void){}
+		Tools(void){}
 		string LowerCase(string line){
 			char lowerLine[50];
 			int length;
@@ -23,15 +24,30 @@ class Operations {
 			length = str.copy(lowerLine, length);
 			lowerLine[length] = '\0';
 			for (int i=0; i<length; i++){lowerLine[i] = tolower(line[i]);}
+			if (lowerLine[length-1] == ';') lowerLine[length-1] = '\0';
 			return lowerLine;
 		}
-		bool FileExists(string fileName){
-			bool exists;
+		string* SplitString(string str, char delimiter){
+			string word;
+			static string strArray[50];
+			int i=0;
+			stringstream ss(str);
 
-			ifstream file(fileName);
-			exists = (file ? true : false);
-			file.close();
-			return exists;
+			while (!ss.eof()){
+				getline(ss, word, delimiter);
+				strArray[i] = word;
+				i++;
+			}
+			return strArray;
+		}
+		template <typename type>
+		int FindIndex(type array[], int length, string seek){
+			for (int i=0; i<length; i++){
+				if (array[i].name == seek) {
+					return i;
+				}
+			}
+			return -1;
 		}
 		double Pow(double value, int pow){
 			double result=1.;
@@ -43,5 +59,5 @@ class Operations {
 };
 /* **************************************************************************** */
 
-#endif /* _OPERATIONS_H_ */
+#endif /* _TOOLS_H_ */
 

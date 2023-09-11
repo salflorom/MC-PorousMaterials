@@ -1,0 +1,80 @@
+# Input script for running MC simulations.
+
+EquilibriumSets 5e1;
+ProductionSets 1e5;
+CyclesPerSet 1e3;
+PrintEveryNSets 1e0;
+
+ExternalTemperature 87.3; #K
+#ExternalPressure 1.5e5; #Pa
+
+#FluidName Ga;
+#MolarMass 69.723; #g/mol
+
+FluidName Ar;
+MolarMass 39.948; #g/mol
+ChemicalPotential -1141.3790680498848; #K
+
+#Ga Ga VdWPotential eam_ga;
+#Ga Ga sigma 2.61; #Angstrom
+#Ga Ga epsilon 1852; #K
+#Ga Ga rcut 8.3; #Angstrom
+
+Ar Ar VdWPotential LJ;
+Ar Ar sigma 3.405; #Angstrom
+Ar Ar epsilon 119.6; #K
+Ar Ar rcut 17; #Angstrom
+
+#Ga Ar VdWPotential LJ;
+#Ga Ar sigma 3; #Angstrom
+#Ga Ar epsilon 800; #K
+#Ga Ar rcut 10; #Angstrom
+
+BoxName Box0;
+Geometry Cylinder; #Sphere, Cylinder, Slit, Bulk.
+SurfaceDensity 0.153; #Angstrom^-2
+#NLayersPerWall 1;
+#DistanceBetweenLayers 3.35; #Angstrom
+#Size 34.31525563577814; #Angstrom
+#Size 16.8013425;
+Size 30;
+
+#BoxName Box1;
+#Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
+#Size 34.31525563577814; #Angstrom
+
+Box0 Ar sigma 3; #Angstrom
+Box0 Ar epsilon 171.24; #K
+Box0 Ar VdWPotential LJ; #LJ or None (no solid-fluid interaction).
+Box0 Ar NumberOfParticles 1;
+#Box1 Ar NumberOfParticles 300;
+
+#SampleRDF Ar Ar; Check!
+
+NDisplacementAttempts 250; #Advice: Set it to the num. of boxes.
+#NVolumeAttempts 1; #Advice: Set it to the num. of boxes.
+NSwapAttempts 250; #Advice: Set it to the total num. of particles.
+
+#EoS
+
+#ExternalTemperature 87.3; #K
+##ExternalPressure 101302.1424862485; #Pa
+#ChemicalPotential -1141.37906805; #K
+#FluidName Ar;
+	#NumberOfParticles 0;
+	##Density 1.39540852; #g/cm^3
+	#MolarMass 39.948; #g/mol
+	#VdWPotential LJ; #LJ (for Lennard-Jones fluids) or EAM_Ga (for gallium).
+	#sigma_ff 3.405; #Angstrom
+	#epsilon_ff 119.6; #K
+	#Rcut 17.01; #Angstrom
+#FrameworkName silica;
+	#Geometry Sphere; #Sphere, Cylinder, Slit, Bulk.
+	#sigma_sf 3; #Angstrom
+	#epsilon_sf 171.24; #K
+	#Potential LJ; #LJ or None (no solid-fluid interaction).
+	#SurfaceDensity 0.153; #Angstrom^-2
+	##NLayersPerWall 1;
+	##DistanceBetweenLayers 3.35; #Angstrom
+	#PoreSize 30; #Angstrom
+
