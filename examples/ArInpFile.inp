@@ -1,16 +1,18 @@
 # Input script for running MC simulations.
 
+ProjectName CH4_slit_298K_2e6Pa
+
 EquilibriumSets 5e1;
 ProductionSets 1e4;
 CyclesPerSet 1e3;
 PrintEveryNSets 1e0;
 
-ExternalTemperature 87.3; #K
+ExternalTemperature 298; #K
 #ExternalPressure 50651.07124312425; #Pa
 
 FluidName CH4;
 MolarMass 16.04; #g/mol
-ChemicalPotential -772.5259117618194; #K
+ChemicalPotential -1205.7078834688166; #K
 
 CH4 CH4 VdWPotential LJ;
 CH4 CH4 sigma 3.73; #Angstrom
@@ -18,7 +20,7 @@ CH4 CH4 epsilon 148.0; #K
 CH4 CH4 rcut 18.65; #Angstrom
 
 BoxName Box0;
-Geometry Bulk; #Sphere, Cylinder, Slit, Bulk.
+Geometry Slit; #Sphere, Cylinder, Slit, Bulk.
 #SurfaceDensity 0.153; #Angstrom^-2
 #NLayersPerWall 3;
 #DistanceBetweenLayers 3.35; #Angstrom

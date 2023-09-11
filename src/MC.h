@@ -6,14 +6,14 @@
 #include <string>
 #include <cstdlib>
 #include <cmath>
-#include <random>
+#include <random> // random_device, mt19937_64, uniform_real_distribution
 
 #define NBINS 200
 #define MAXPART 9999 //Max. num. of particles. 0th part. is to save old config.
 #define MAXSPECIES 2 //Max. num. of species.
 #define MAXBOX 2 //Max. num. of boxes. 0th box is to save old comfiguration.
 #define pi M_PI
-#define kb 1.380649e-23 // J/K
+#define kb  1.380649e-23 // J/K
 #define na 6.02214076e23 // mol^-1
 #define planck 6.62607015e-34 // J*s
 
@@ -44,7 +44,7 @@ class MC {
 			double dr, dv;
 			int nDispAttempts, nSwapAttempts, nVolAttempts;
 			int cycle, rdf[2];
-			string compute[3];
+			string projName;
 		} sim;
 		struct Particle{
 			double x, y, z;
@@ -114,7 +114,6 @@ class MC {
 		int GetNEquilSets(void){return int(sim.nEquilSets);}
 		int GetNCyclesPerSet(void){return int(sim.nCyclesPerSet);}
 		int GetPrintEvery(void){return int(sim.printEvery);}
-		string* GetCompute(void){return sim.compute;}
 
 		double NeighDistance(int, Particle, Particle);
 		// Fluid-Fluid potentials //
@@ -130,9 +129,9 @@ class MC {
 		// Fluid-Fluid potentials //
 
 		// Solid-Fluid potentials //
-		double SlitLJ(int, int, int);
-		double CylindricalLJ(int, int, int);
-		double SphericalLJ(int, int, int);
+		double SlitLJ_Pot(int, int, int);
+		double CylindricalLJ_Pot(int, int, int);
+		double SphericalLJ_Pot(int, int, int);
 		// Solid-Fluid potentials //
 /* **************************************************************************** */
 };
