@@ -41,7 +41,7 @@ void MC::PrintParams(void){
 	}
 	cout << endl;
 
-	cout << "Fluid-fluid interaction parameters: " << endl;
+	cout << "Fluid-fluid interaction parameters:" << endl;
 	for (i=0; i<thermoSys.nSpecies; i++){
 		for (j=i; j<thermoSys.nSpecies; j++){
 			cout << fluid[i].name << "-" << fluid[j].name << endl;
@@ -66,7 +66,7 @@ void MC::PrintParams(void){
 	}
 	cout << endl;
 
-	cout << "Box-fluid interaction parameters: " << endl;
+	cout << "Box-fluid interaction parameters:" << endl;
 	for (i=0; i<thermoSys.nBoxes; i++){
 		for (j=0; j<thermoSys.nSpecies; j++){
 			cout << box[i].name << "-" << fluid[j].name << endl;
@@ -103,7 +103,7 @@ void MC::OutputDirectory(void){
 	Tools tls;
 	ostringstream outDirName, boxDirName, command;
 
-	outDirName << sim.projName;
+	outDirName << "./" << sim.projName;
 	if (! std::filesystem::is_directory(outDirName.str())){
 		command << "mkdir " << outDirName.str();
 		system(command.str().c_str());
@@ -144,7 +144,7 @@ void MC::PrintRDF(void){
 			gofr[bin] /= dn_ideal;
 		}
 		//Write into the file.
-		outDirName << sim.projName;
+		outDirName << "./" << sim.projName;
 		outFileName << outDirName.str() << box[0].name << "/rdf_";
 		outFileName << fluid[ithSpecies].name << "-" << fluid[jthSpecies].name << ".dat";
 		rdfFile.open(outFileName.str());
@@ -161,7 +161,7 @@ void MC::PrintTrajectory(int set){
 	ostringstream outDirName, outFileName;
 	double tmp=0.0;
 
-	outDirName << sim.projName;
+	outDirName << "./" << sim.projName;
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		outFileName << outDirName.str() << "/" << box[i].name << "/trajectory.exyz";
 		if (set == 0) trajFile.open(outFileName.str());
@@ -189,56 +189,46 @@ void MC::PrintLog(int set){
 	ostringstream outDirName, outBoxName, outFileName;
 	double density, volume, ffEnergy, energy;
 
-	outDirName << sim.projName;
+	outDirName << "./" << sim.projName;
 	for (int i=0; i<thermoSys.nBoxes; i++){
-		outFileName << outDirName.str() << "/" << box[i].name << "/simulation.log";
-		volume = box[i].volume; //AA^3
-		ffEnergy = box[i].manyBodyE + 0.5*box[i].pairPotE;
-		energy = box[i].manyBodyE + 0.5*box[i].pairPotE + box[i].boxE;
-		if (set == 0){
-			logFile.open(outFileName.str());
-			logFile << "Set\tTemp[K]\twidth[AA]\tVolume[AA^3]\t";
-			logFile << "ffE/particle[K]\tsfE/particle[K]\tE/particle[K]\t";
-			for (int j=0; j<thermoSys.nSpecies; j++){
-				logFile << "\tNParts_" << fluid[j].name << "\t";
-				logFile << "Dens[g/cm^3]_" << fluid[j].name << "\t";
-				logFile << "muEx[K]_" << fluid[j].name << "\t";
-				logFile << "mu[K]_" << fluid[j].name << "\n";
-			}
-		}else{
-			logFile.open(outFileName.str(), ios::app);
-			logFile << fixed;
-			logFile << setprecision(5);
-			logFile << set << "\t";
-			logFile << thermoSys.temp << "\t" << box[i].width[2] << "\t" << volume << "\t";
-			logFile << ffEnergy/box[i].nParts << "\t";
-			logFile << box[i].boxE/box[i].nParts << "\t";
-			logFile << energy/box[i].nParts << "\t";
-			for (int j=0; j<thermoSys.nSpecies; j++){
+		for (int j=0; j<thermoSys.nSpecies; j++){
+			outFileName << outDirName.str() << "/" << box[i].name;
+			outFileName << "/simulation_" << fluid[j].name << ".log";
+			volume = box[i].volume; //AA^3
+			ffEnergy = box[i].manyBodyE + 0.5*box[i].pairPotE;
+			energy = box[i].manyBodyE + 0.5*box[i].pairPotE + box[i].boxE;
+			if (set == 0){
+				logFile.open(outFileName.str());
+				logFile << "Set\tTemp[K]\twidth[AA]\tVolume[AA^3]\t";
+				logFile << "ffE/particle[K]\tsfE/particle[K]\tE/particle[K]\t";
+				logFile << "NParts\t" << "Dens[g/cm^3]\t" << "muEx[K]\t" << "mu[K]\n";
+			}else{
 				density = box[i].fluid[j].nParts/volume; // AA^-3
 				density *= fluid[j].molarMass/na*1e24; // g/cm^3
+				logFile.open(outFileName.str(), ios::app);
+				logFile << fixed;
+				logFile << setprecision(7);
+				logFile << set << "\t";
+				logFile << thermoSys.temp << "\t" << box[i].width[2] << "\t" << volume << "\t";
+				logFile << ffEnergy/box[i].nParts << "\t";
+				logFile << box[i].boxE/box[i].nParts << "\t";
+				logFile << energy/box[i].nParts << "\t";
 				logFile << box[i].nParts << "\t";
 				logFile << density << "\t"; // g/cm^3
 				logFile	<< box[i].fluid[j].muEx << "\t"; // K
 				logFile	<< box[i].fluid[j].mu << "\n"; // K
 			}
+			logFile.close();
+			outFileName.str(""); outFileName.clear();
+			logFile.clear();
 		}
-		logFile.close();
-		outFileName.str(""); outFileName.clear();
-		logFile.clear();
 	}
 }
 void MC::PrintStats(int set){
 	cout << fixed;
-	cout << setprecision(5);
+	cout << setprecision(7);
 	if (set < sim.nEquilSets) cout << "Equilibrium set: " << set << endl;
 	else cout << "Set: " << set << endl;
-	if (stats.nDisplacements > 0){
-		cout << "AcceptDispRatio; RegectDispRatio:\t";
-		cout << stats.acceptance*1./stats.nDisplacements << "; ";
-		cout << stats.rejection*1./stats.nDisplacements << endl;
-		if (set < sim.nEquilSets) cout << "Step size: " << sim.dr << endl;
-	}
 	if (sim.nVolAttempts > 0){
 		cout << "AcceptVolRatio; RejectVolRatio:\t";
 		cout << stats.acceptanceVol*1./stats.nVolChanges << "; ";
@@ -251,13 +241,17 @@ void MC::PrintStats(int set){
 		cout << stats.rejectSwap*1./stats.nSwaps << endl;
 	}
 	for (int i=0; i<thermoSys.nBoxes; i++){
-		//if (box[i].nParts > 0){
-			cout << "Box " << box[i].name << ":" << endl;
-			cout << "\tNumParticles; BoxSize; Energy/Particle:\t";
-			cout << box[i].nParts << "; ";
-			cout << box[i].width[2] << "; ";
-			cout << box[i].energy/box[i].nParts << endl;
-		//}
+		cout << "Box " << box[i].name << ":" << endl;
+		if (stats.nDisplacements[i] > 0){
+			cout << "\tAcceptDispRatio; RegectDispRatio:\t";
+			cout << stats.acceptance[i]*1./stats.nDisplacements[i] << "; ";
+			cout << stats.rejection[i]*1./stats.nDisplacements[i] << endl;
+			if (set < sim.nEquilSets) cout << "\tStep size: " << sim.dr[i] << endl;
+		}
+		cout << "\tNumParticles; BoxSize; Energy/Particle:\t";
+		cout << box[i].nParts << "; ";
+		cout << box[i].width[2] << "; ";
+		cout << box[i].energy/box[i].nParts << endl;
 	}
 	cout << endl;
 }

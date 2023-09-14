@@ -18,8 +18,9 @@ void MC::MinimizeEnergy(void){
 			BoxEnergy(i);
 			cout << "\tEnergy/part. of box \"" << box[i].name << "\" before minimization: ";
 			cout << box[i].energy/box[i].nParts << " K" << endl;
-			for (int j=0; j<box[i].nParts; j++){
-				for (int l=0; l<initMoves; l++) MoveParticle();
+			for (int j=0; j<initMoves; j++){
+				for (int l=0; l<box[i].nParts; l++) MoveParticle();
+				AdjustMCMoves();
 			}
 			BoxEnergy(i);
 			cout << "\tEnergy/part. of box \"" << box[i].name << "\" after minimization (";

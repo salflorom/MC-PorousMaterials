@@ -7,7 +7,7 @@
 #include <cmath> //M_PI
 #include <random> // random_device, mt19937_64, uniform_real_distribution
 
-#define NBINS 200
+#define NBINS 100
 #define MAXPART 9999 //Max. num. of particles. 0th part. is to save old config.
 #define MAXSPECIES 2 //Max. num. of species.
 #define MAXBOX 2 //Max. num. of boxes. 0th box is to save old comfiguration.
@@ -32,15 +32,15 @@ class MC {
 		uniform_real_distribution<double> dis{0.0,0.9999};
 
 		struct Stats{
-			int acceptance, rejection, nDisplacements;
+			int acceptance[MAXBOX], rejection[MAXBOX], nDisplacements[MAXBOX];
 			int acceptanceVol, rejectionVol, nVolChanges;
 			int acceptSwap, rejectSwap, nSwaps;
-			int widomInsertions;
+			int widomInsertions[MAXBOX];
 			double binWidth, widom[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
 			double nSets, nEquilSets, nCyclesPerSet, printEvery;
-			double dr, dv;
+			double dr[MAXBOX], dv;
 			int nDispAttempts, nSwapAttempts, nVolAttempts;
 			int cycle, rdf[2];
 			string projName;

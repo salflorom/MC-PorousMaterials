@@ -17,7 +17,7 @@ class Tools {
 		Tools(void){}
 		string LowerCase(string line){
 			char lowerLine[50];
-			int length;
+			size_t length;
 			string str(line);
 
 			length = strlen(line.c_str());

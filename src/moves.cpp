@@ -17,15 +17,6 @@ int* MC::GetMCMoves(void){
 	moves[2] = sim.nSwapAttempts;
 	return moves;
 }
-void MC::InitialConfig(void){
-	for (int i=0; i<thermoSys.nBoxes; i++){
-		for (int j=0; j<thermoSys.nSpecies; j++){
-			for (int k=1; k<=box[i].fluid[j].nParts; k++) InsertParticle(i, j, k);
-		}
-	}
-	cout << "Initial configuration set." << endl;
-	cout << endl;
-}
 void MC::InsertParticle(int ithBox, int ithSpecies, int index){
 	double radius, theta, phi; // Spherical geometry.
 	double rho; // Cylindrical geometry.
@@ -61,12 +52,23 @@ void MC::InsertParticle(int ithBox, int ithSpecies, int index){
 		box[ithBox].fluid[ithSpecies].particle[index].z = Random()*box[ithBox].width[2];
 	}
 }
+void MC::InitialConfig(void){
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		for (int j=0; j<thermoSys.nSpecies; j++){
+			for (int k=1; k<=box[i].fluid[j].nParts; k++) InsertParticle(i, j, k);
+		}
+	}
+	cout << "Initial configuration set." << endl;
+	cout << endl;
+}
 void MC::AdjustMCMoves(void){
 	double ratio;
 
-	ratio = stats.acceptance*1./(1.*stats.nDisplacements);
-	if (ratio < 0.2) sim.dr /= 1.1;
-	else sim.dr *= 1.1;
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		ratio = stats.acceptance[i]*1./(1.*stats.nDisplacements[i]);
+		if (ratio < 0.2) sim.dr[i] /= 1.1;
+		else sim.dr[i] *= 1.1;
+	}
 	//if (sim.nVolAttempts > 0){
 		//ratio = stats.acceptanceVol*1./(1.*stats.nVolChanges);
 		//if (ratio < 0.3) sim.dv /= 1.1;
@@ -112,7 +114,6 @@ void MC::MoveParticle(void){
 	double oldBoxEnergy, newBoxEnergy;
 	double deltaManyBodyE=0, deltaPairPotE=0, deltaBoxEnergy=0;
 
-	stats.nDisplacements++;
 	// Select particle.
 	rand = int(Random()*thermoSys.nParts);
 	tmp = 0;
@@ -132,6 +133,7 @@ void MC::MoveParticle(void){
 			break;
 		}
 	}
+	stats.nDisplacements[ithBox]++;
 	index = int(Random()*box[ithBox].fluid[ithSpecies].nParts)+1;
 	ithPart = box[ithBox].fluid[ithSpecies].particle[index];
 	box[ithBox].fluid[ithSpecies].particle[0] = ithPart; //Save old position of selected particle.
@@ -141,9 +143,9 @@ void MC::MoveParticle(void){
 	oldBoxEnergy = box[ithBox].fluid[ithSpecies].particle[index].boxE;
 	oldEnergy = box[ithBox].fluid[ithSpecies].particle[index].energy;
 	// Move particle.
-	ithPart.x += (Random()-0.5)*sim.dr; //AA
-	ithPart.y += (Random()-0.5)*sim.dr; //AA
-	ithPart.z += (Random()-0.5)*sim.dr; //AA
+	ithPart.x += (Random()-0.5)*sim.dr[ithBox]; //AA
+	ithPart.y += (Random()-0.5)*sim.dr[ithBox]; //AA
+	ithPart.z += (Random()-0.5)*sim.dr[ithBox]; //AA
 	PBC(ithBox, ithPart);
 	box[ithBox].fluid[ithSpecies].particle[index] = ithPart;
 	// Metropolis.
@@ -155,7 +157,7 @@ void MC::MoveParticle(void){
 	deltaEnergy = newEnergy-oldEnergy;
 	arg = deltaEnergy/thermoSys.temp;
 	if (Random() < exp(-arg)){
-		stats.acceptance++;
+		stats.acceptance[ithBox]++;
 		deltaManyBodyE = newManyBodyE - oldManyBodyE;
 		deltaPairPotE = newPairPotE - oldPairPotE;
 		deltaBoxEnergy = newBoxEnergy - oldBoxEnergy;
@@ -164,7 +166,7 @@ void MC::MoveParticle(void){
 		box[ithBox].boxE += deltaBoxEnergy;
 		box[ithBox].energy += deltaManyBodyE + 0.5*deltaPairPotE + deltaBoxEnergy;
 	}else{
-		stats.rejection++;
+		stats.rejection[ithBox]++;
 		ithPart = box[ithBox].fluid[ithSpecies].particle[0];
 		box[ithBox].fluid[ithSpecies].particle[index] = ithPart;
 	}
@@ -177,7 +179,7 @@ void MC::ChangeVolume(void){
 	Box oldBox0, oldBox1;
 	int ithBox;
 	double deltaE0, deltaE1;
-	double logNewVol, deltaVol0, deltaVol1;
+	double logNewVol, deltaVol0;
 	double arg0, arg1;
 	double extPress = thermoSys.press/kb*1e-30; // K/AA^3
 
@@ -335,7 +337,7 @@ void MC::SwapParticle(void){
 			EnergyOfParticle(inBox, ithSpecies, inIndex);
 			inEnergy = box[inBox].fluid[ithSpecies].particle[inIndex].energy; // K
 			stats.widom[inBox][ithSpecies] += box[inBox].volume*exp(-inEnergy/thermoSys.temp)/(box[inBox].nParts+1); // Compute mu through Widom.
-			stats.widomInsertions++;
+			stats.widomInsertions[inBox]++;
 			outIndex = int(Random()*box[outBox].fluid[ithSpecies].nParts + 1);
 			EnergyOfParticle(outBox, ithSpecies, outIndex); //K
 			outEnergy = box[outBox].fluid[ithSpecies].particle[outIndex].energy; // K
@@ -371,18 +373,58 @@ void MC::SwapParticle(void){
 // Note 2: The Widom parameter is computed randomly in any box unless the chosen box is emtpy.
 void MC::ComputeWidom(void){
 	Tools tls;
-	double volume;
+	int ithSpecies;
 	double energy=0.;
 
 	if (thermoSys.nBoxes == 1 && sim.nSwapAttempts == 0){
-		InsertParticle(0, 0, MAXPART-1); // Insert virtual particle.
-		stats.widomInsertions++;
-		EnergyOfParticle(0, 0, MAXPART-1);
-		energy = box[0].fluid[0].particle[MAXPART-1].energy;
+		ithSpecies = int(Random()*thermoSys.nSpecies);
+		InsertParticle(0, ithSpecies, MAXPART-1); // Insert virtual particle.
+		stats.widomInsertions[0]++;
+		EnergyOfParticle(0, ithSpecies, MAXPART-1);
+		energy = box[0].fluid[ithSpecies].particle[MAXPART-1].energy;
 		if (sim.nVolAttempts > 0){
-			stats.widom[0][0] += box[0].volume*exp(-energy/thermoSys.temp)/(box[0].fluid[0].nParts+1);
-		}else stats.widom[0][0] += exp(-energy/thermoSys.temp);
-		stats.widom[0][0] += exp(-energy/thermoSys.temp);
+			stats.widom[0][ithSpecies] += box[0].volume*exp(-energy/thermoSys.temp)/(box[0].fluid[ithSpecies].nParts+1);
+		}else stats.widom[0][ithSpecies] += exp(-energy/thermoSys.temp);
+		stats.widom[0][ithSpecies] += exp(-energy/thermoSys.temp);
+	}
+}
+// Computes mu in each box from the Widom insearsions performed in the ComputeWidom method.
+// Note: It only works for simple fluids.
+// Note 2: the chemical potential is printed in all boxes.
+void MC::ComputeChemicalPotential(void){
+	Tools tls;
+	double thermalWL, particleMass, volume, muIdeal, muExcess, insertionParam;
+	double extPress;
+
+	if (thermoSys.nBoxes == 1 && sim.nSwapAttempts == 0){
+		for (int i=0; i<thermoSys.nSpecies; i++){
+			particleMass = fluid[i].molarMass/na*1e-3; // kg/particle
+			thermalWL = planck/sqrt(2.0*pi*particleMass*kb*thermoSys.temp)*1e10; //AA
+			volume = box[0].volume; //AA^3
+			insertionParam = stats.widom[0][i]/stats.widomInsertions[0];
+			if (sim.nVolAttempts > 0){
+				extPress = thermoSys.press/kb*1e-30; // K/AA^3
+				muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)*extPress/thermoSys.temp); //K
+				muExcess = -thermoSys.temp*log(insertionParam*extPress/thermoSys.temp); //K
+			}else{
+				muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)*(box[0].fluid[0].nParts+1)/volume); //K
+				muExcess = -thermoSys.temp*log(insertionParam); //K
+			}
+			box[0].fluid[i].muEx = muExcess; //K
+			box[0].fluid[i].mu = muIdeal+muExcess; //K
+		}
+	}else if (thermoSys.nBoxes > 1){
+		for (int i=0; i<thermoSys.nBoxes; i++){
+			for (int j=0; j<thermoSys.nSpecies; j++){
+				particleMass = fluid[j].molarMass/na*1e-3; // kg/particle
+				thermalWL = planck/sqrt(2.0*pi*particleMass*kb*thermoSys.temp)*1e10; //AA
+				muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)); //K
+				insertionParam = stats.widom[i][j]/stats.widomInsertions[i];
+				muExcess = -thermoSys.temp*log(insertionParam); //K
+				box[i].fluid[j].muEx = muExcess; //K
+				box[i].fluid[j].mu = muIdeal+muExcess; //K
+			}
+		}
 	}
 }
 

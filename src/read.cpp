@@ -160,6 +160,6 @@ void MC::ReadInputFile(string inFileName){
 		for (j=0; j< thermoSys.nSpecies; j++) box[i].fluid[j].mu = fluid[j].mu;
 	}
 	// Set step size.
-	//sim.dr = fluid[0].sigma[0]; //AA
+	for (i=0; i<thermoSys.nBoxes; i++) sim.dr[i] = 0.1*box[i].width[2]; //AA
 }
 

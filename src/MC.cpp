@@ -13,18 +13,18 @@ MC::MC(void){
 	int i, j, k;
 	ostringstream boxName;
 
-	stats.acceptance = stats.rejection = stats.nDisplacements = 0;
 	stats.acceptanceVol = stats.rejectionVol = stats.nVolChanges = 0;
 	stats.acceptSwap = stats.rejectSwap = stats.nSwaps = 0;
-	stats.widomInsertions = 0;
 	for (i=0; i<MAXBOX; i++){
+		stats.widomInsertions[i] = 0;
+		stats.acceptance[i] = stats.rejection[i] = stats.nDisplacements[i] = 0;
 		for (j=0; j<MAXSPECIES; j++) stats.widom[i][j] = 0.;
 	}
 	for (i=0; i<=NBINS; i++) stats.rdf[i] = 0.;
 	sim.projName = "";
 	sim.rdf[0] = sim.rdf[1] = -1;
-	sim.dr = 1;
-	sim.dv = 1e-1;
+	for (i=0; i<MAXBOX; i++) sim.dr[i] = 1;
+	sim.dv = 1e-3;
 	sim.nEquilSets = sim.nSets = sim.nCyclesPerSet = 0.;
 	sim.nDispAttempts = sim.nVolAttempts = sim.nSwapAttempts = 0;
 	thermoSys.temp = thermoSys.volume = thermoSys.press = -1.;
@@ -73,14 +73,16 @@ MC::MC(void){
 	}
 }
 void MC::ResetStats(void){
-	stats.acceptance = stats.rejection = 0;
-	stats.nDisplacements = 1;
+	int i;
+
 	stats.acceptanceVol = stats.rejectionVol = 0;
 	stats.nVolChanges = 1;
 	stats.acceptSwap = stats.rejectSwap = 0;
 	stats.nSwaps = 1;
-	stats.widomInsertions = 0;
-	for (int i=0; i<thermoSys.nBoxes; i++){
+	for (i=0; i<thermoSys.nSpecies; i++) stats.widomInsertions[i] = 0;
+	for (i=0; i<thermoSys.nBoxes; i++){
+		stats.acceptance[i] = stats.rejection[i] = 0;
+		stats.nDisplacements[i] = 1;
 		for (int j=0; j<thermoSys.nSpecies; j++) stats.widom[i][j] = 0.;
 	}
 }

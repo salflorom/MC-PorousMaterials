@@ -8,6 +8,7 @@
 
 #include <string> // string
 #include <cstdlib> // EXIT_SUCCESS
+#include <iostream> // cout
 
 #include "MC.h"
 
