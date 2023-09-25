@@ -65,9 +65,11 @@ void MC::AdjustMCMoves(void){
 	double ratio;
 
 	for (int i=0; i<thermoSys.nBoxes; i++){
-		ratio = stats.acceptance[i]*1./(1.*stats.nDisplacements[i]);
-		if (ratio < 0.2) sim.dr[i] /= 1.1;
-		else sim.dr[i] *= 1.1;
+		if (box[i].nParts > 0){
+			ratio = stats.acceptance[i]*1./(1.*stats.nDisplacements[i]);
+			if (ratio < 0.2) sim.dr[i] /= 1.1;
+			else sim.dr[i] *= 1.1;
+		}
 	}
 	//if (sim.nVolAttempts > 0){
 		//ratio = stats.acceptanceVol*1./(1.*stats.nVolChanges);
@@ -75,7 +77,7 @@ void MC::AdjustMCMoves(void){
 		//else sim.dv *= 1.1;
 	//}
 }
-void MC::RescaleCenterOfMass(Box oldBox, Box& newBox){
+void MC::RescaleCenterOfMass(Box oldBox, Box& newBox, int ithBox){
 	Tools tls;
 	int i, j;
 	double ratio = newBox.width[2]/oldBox.width[2];
@@ -102,7 +104,7 @@ void MC::RescaleCenterOfMass(Box oldBox, Box& newBox){
 			newBox.fluid[i].particle[j].z *= ratio;
 		}
 	}
-	//sim.dr *= ratio;
+	sim.dr[ithBox] *= ratio;
 	//sim.dv *= ratio;
 }
 void MC::MoveParticle(void){
@@ -134,6 +136,7 @@ void MC::MoveParticle(void){
 		}
 	}
 	stats.nDisplacements[ithBox]++;
+	box[ithBox].oldEnergy = box[ithBox].energy;
 	index = int(Random()*box[ithBox].fluid[ithSpecies].nParts)+1;
 	ithPart = box[ithBox].fluid[ithSpecies].particle[index];
 	box[ithBox].fluid[ithSpecies].particle[0] = ithPart; //Save old position of selected particle.
@@ -192,7 +195,7 @@ void MC::ChangeVolume(void){
 		oldBox0 = box[ithBox]; // Record old information.
 		logNewVol = log(box[ithBox].volume) + (Random()-0.5)*sim.dv; //Perform volume change step.
 		box[ithBox].volume = exp(logNewVol);
-		RescaleCenterOfMass(oldBox0, box[ithBox]); //Rescale to trial config.
+		RescaleCenterOfMass(oldBox0, box[ithBox], ithBox); //Rescale to trial config.
 		// Set box sizes according to trial volume.
 		//if (pore.geometry == "sphere") pore.width[0] = pore.width[1] = pore.width[2] = finalBoxWidth;
 		//else if (pore.geometry == "cylinder") pore.width[1] = pore.width[2] = finalBoxWidth;
@@ -218,8 +221,8 @@ void MC::ChangeVolume(void){
 		logNewVol = log(box[0].volume/box[1].volume) + (Random()-0.5)*sim.dv; //Perform volume change step.
 		box[0].volume = thermoSys.volume*exp(logNewVol)/(1+exp(logNewVol));
 		box[1].volume = thermoSys.volume-box[0].volume;
-		RescaleCenterOfMass(oldBox0, box[0]); //Rescale to trial config.
-		RescaleCenterOfMass(oldBox1, box[1]); //Rescale to trial config.
+		RescaleCenterOfMass(oldBox0, box[0], ithBox); //Rescale to trial config.
+		RescaleCenterOfMass(oldBox1, box[1], ithBox); //Rescale to trial config.
 		// Set box sizes according to trial volume.
 		box[0].width[2] = ComputeBoxWidth(box[0], box[0].volume);
 		box[0].width[0] = box[0].width[1] = box[0].width[2];
@@ -240,7 +243,7 @@ void MC::ChangeVolume(void){
 	}
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		if (box[i].geometry == "bulk" && box[i].width[2] < box[i].maxRcut){
-			cout << "Warning: Box surpassed the minimum allowed size: ";
+			cout << "Warning: Box " << box[i].name << " surpassed the minimum allowed size: ";
 			cout << box[i].maxRcut << endl;
 		}
 	}
@@ -267,6 +270,7 @@ void MC::SwapParticle(void){
 				break;
 			}
 		}
+		box[0].oldEnergy = box[0].energy;
 		particleMass = fluid[ithSpecies].molarMass/na*1e-3; // kg/particle
 		thermalWL = planck/sqrt(2.0*pi*particleMass*kb*thermoSys.temp)*1e10; // AA
 		zz = exp(fluid[ithSpecies].mu/thermoSys.temp)/tls.Pow(thermalWL,3); // AA^-3
@@ -333,6 +337,8 @@ void MC::SwapParticle(void){
 				}
 			}
 			inIndex = box[inBox].fluid[ithSpecies].nParts+1;
+			box[inBox].oldEnergy = box[inBox].energy;
+			box[outBox].oldEnergy = box[outBox].energy;
 			InsertParticle(inBox, ithSpecies, inIndex);
 			EnergyOfParticle(inBox, ithSpecies, inIndex);
 			inEnergy = box[inBox].fluid[ithSpecies].particle[inIndex].energy; // K

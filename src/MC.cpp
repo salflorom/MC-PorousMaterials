@@ -58,6 +58,7 @@ MC::MC(void){
 		box[i].manyBodyE = 0.;
 		box[i].pairPotE = 0.;
 		box[i].boxE = 0.;
+		box[i].oldEnergy = 0.;
 		box[i].energy = 0.;
 		box[i].maxRcut = 0.;
 		box[i].fix = false;

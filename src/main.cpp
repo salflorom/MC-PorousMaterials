@@ -33,8 +33,9 @@ int main(int argc, char** argv){
 	nDispAttempts = moves[0];
 	nVolAttempts = moves[1];
 	nSwapAttempts = moves[2];
-	mc.MinimizeEnergy();
 	mc.PrintTrajectory(0);
+	mc.MinimizeEnergy();
+	mc.PrintTrajectory(1);
 	mc.PrintLog(0);
 	for (int set=1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
@@ -44,6 +45,7 @@ int main(int argc, char** argv){
 			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.
 			else if (rand <= nDispAttempts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
 			else if (rand <= nDispAttempts + nVolAttempts + nSwapAttempts) mc.SwapParticle(); //Try swap.
+			mc.CorrectEnergy();
 			if (set > nEquilSets){
 				mc.ComputeWidom();
 				mc.ComputeRDF();
@@ -55,7 +57,7 @@ int main(int argc, char** argv){
 			mc.PrintTrajectory(set);
 			mc.PrintLog(set);
 		}
-		if (set <= nEquilSets) mc.AdjustMCMoves();
+		//if (set <= nEquilSets) mc.AdjustMCMoves();
 	}
 	mc.PrintRDF();
 	return EXIT_SUCCESS;

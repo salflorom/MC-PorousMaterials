@@ -3,6 +3,7 @@
 #include <cstring> // strlen
 #include <iostream> // cout
 #include <climits> // INT_MAX
+#include <cmath> // isnan
 
 #include "MC.h"
 #include "tools.h"
@@ -20,7 +21,7 @@ void MC::MinimizeEnergy(void){
 			cout << box[i].energy/box[i].nParts << " K" << endl;
 			for (int j=0; j<initMoves; j++){
 				for (int l=0; l<box[i].nParts; l++) MoveParticle();
-				AdjustMCMoves();
+				//AdjustMCMoves();
 			}
 			BoxEnergy(i);
 			cout << "\tEnergy/part. of box \"" << box[i].name << "\" after minimization (";
@@ -28,6 +29,14 @@ void MC::MinimizeEnergy(void){
 			cout << box[i].energy/box[i].nParts << " K" << endl;
 			cout << endl;
 		}
+	}
+}
+void MC::CorrectEnergy(void){
+	double relEnergyChange;
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		relEnergyChange = box[i].energy/box[i].oldEnergy;
+		//if (relEnergyChange > 1 || isnan(relEnergyChange)) BoxEnergy(i);
+		if (relEnergyChange > 1) BoxEnergy(i);
 	}
 }
 void MC::EnergyOfParticle(int ithBox, int ithSpecies, int index){

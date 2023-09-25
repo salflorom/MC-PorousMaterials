@@ -68,7 +68,7 @@ class MC {
 			int nParts;
 			bool fix, PBC[3];
 			double width[3];
-			double solidDens, volume, deltaLayers, maxRcut;
+			double oldEnergy, solidDens, volume, deltaLayers, maxRcut;
 			double energy, manyBodyE, pairPotE, boxE; // Energy of the box.
 			int nLayersPerWall;
 			Fluid fluid[MAXSPECIES]; //For solid-species properties.
@@ -91,7 +91,7 @@ class MC {
 		void AdjustMCMoves(void);
 		void MoveParticle(void);
 		void ChangeVolume(void);
-		void RescaleCenterOfMass(Box, Box&);
+		void RescaleCenterOfMass(Box, Box&, int);
 		void SwapParticle(void);
 		void PBC(int, Particle&);
 		void ComputeRDF(void);
@@ -107,6 +107,7 @@ class MC {
 		double ComputeVolume(Box);
 		double ComputeBoxWidth(Box, double);
 		void BoxEnergy(int);
+		void CorrectEnergy(void);
 
 		int* GetMCMoves(void);
 		int GetNSets(void){return int(sim.nSets);}
