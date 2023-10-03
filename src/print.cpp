@@ -19,7 +19,7 @@ void MC::PrintParams(void){
 	cout << "Simulation parameters:" << endl;
 	cout << "\tEquilibration sets: " << sim.nEquilSets << endl;
 	cout << "\tProduction sets: " << sim.nSets << endl;
-	cout << "\tCycles per set: " << sim.nCyclesPerSet << endl;
+	cout << "\tSteps per set: " << sim.nStepsPerSet << endl;
 	cout << "\tPrint every n sets: " << sim.printEvery << endl;
 	cout << "\tNum. of displacement attempts: " << sim.nDispAttempts << endl;
 	cout << "\tNum. of change volume attempts: " << sim.nVolAttempts << endl;
@@ -137,7 +137,7 @@ void MC::PrintRDF(void){
 		rho = nParts/box[0].volume;
 		constant = (4*pi*rho/3);
 		for (int bin=1; bin<=NBINS; bin++){
-			gofr[bin] = stats.rdf[bin]/(1.*nParts*sim.nCyclesPerSet*sim.nSets);
+			gofr[bin] = stats.rdf[bin]/(1.*nParts*sim.nStepsPerSet*sim.nSets);
 			lowR = bin*deltaR;
 			highR = lowR + deltaR;
 			dn_ideal = constant*(tls.Pow(highR,3)-tls.Pow(lowR,3));
@@ -145,13 +145,15 @@ void MC::PrintRDF(void){
 		}
 		//Write into the file.
 		outDirName << "./" << sim.projName;
-		outFileName << outDirName.str() << box[0].name << "/rdf_";
+		outFileName << outDirName.str() << "/" << box[0].name << "/rdf_";
 		outFileName << fluid[ithSpecies].name << "-" << fluid[jthSpecies].name << ".dat";
 		rdfFile.open(outFileName.str());
 		rdfFile << "nBins: "<< NBINS << endl;
 		rdfFile << "r[AA]\tg(r)" << endl;
 		for (int bin=1; bin<=NBINS; bin++) rdfFile << (bin+0.5)*deltaR << "\t" << gofr[bin] << endl;
 		rdfFile.close();
+		outFileName.str(""); outFileName.clear();
+		rdfFile.clear();
 	}
 }
 void MC::PrintTrajectory(int set){

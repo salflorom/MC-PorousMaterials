@@ -75,11 +75,15 @@ void MC::EnergyOfParticle(int ithBox, int ithSpecies, int index){
 	//Fluid-Fluid energy
 	for (int jthSpecies=0; jthSpecies<thermoSys.nSpecies; jthSpecies++){
 		if (fluid[ithSpecies].vdwPot[jthSpecies] == "lj"){ //Lennard-Jones potential.
-			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += LJ_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += LJ126_Pot(ithBox, ithSpecies, jthSpecies, index);
 		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "hs"){
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += HardSphere_Pot(ithBox, ithSpecies, jthSpecies, index);
 		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_ga"){ //EAM potential for Ga.
-			tmp = EAMGA_Pot(ithBox, ithSpecies, jthSpecies, index);
+			tmp = EAMGa_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_rb"){ //EAM potential for Rb.
+			tmp = EAMRb_Pot(ithBox, ithSpecies, jthSpecies, index);
 			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
 		}

@@ -39,7 +39,7 @@ class MC {
 			double binWidth, widom[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
-			double nSets, nEquilSets, nCyclesPerSet, printEvery;
+			double nSets, nEquilSets, nStepsPerSet, printEvery;
 			double dr[MAXBOX], dv;
 			int nDispAttempts, nSwapAttempts, nVolAttempts;
 			int cycle, rdf[2];
@@ -112,20 +112,25 @@ class MC {
 		int* GetMCMoves(void);
 		int GetNSets(void){return int(sim.nSets);}
 		int GetNEquilSets(void){return int(sim.nEquilSets);}
-		int GetNCyclesPerSet(void){return int(sim.nCyclesPerSet);}
+		int GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
 		int GetPrintEvery(void){return int(sim.printEvery);}
 
 		double NeighDistance(int, Particle, Particle);
 		// Fluid-Fluid potentials //
 		double HardSphere_Pot(int, int, int, int);
-		double LJ_Pot(int, int, int, int);
-		// EAM Ga potential vvvvv //
-		double* EAMGA_Pot(int, int, int, int);
-		double StepUnit(double, double, double);
-		double EmbPot(double);
-		double eDens(double);
-		double PairPot(double);
-		// EAM Ga potential ^^^^^ //
+		// Lennard-Jones 12-6 potential //
+		double LJ126_Pot(int, int, int, int);
+		// EAM Ga potential //
+		double* EAMGa_Pot(int, int, int, int);
+		double EAMGa_StepUnit(double, double, double);
+		double EAMGa_EmbPot(double);
+		double EAMGa_eDens(double);
+		double EAMGa_PairPot(double);
+		// EAM Rb potential //
+		double* EAMRb_Pot(int, int, int, int);
+		double EAMRb_EmbPot(double);
+		double EAMRb_eDens(double);
+		double EAMRb_PairPot(double);
 		// Fluid-Fluid potentials //
 
 		// Solid-Fluid potentials //

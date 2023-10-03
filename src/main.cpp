@@ -14,7 +14,7 @@
 
 int main(int argc, char** argv){
 	string inFileName;
-	int nSets, nEquilSets, nCyclesPerSet, printEvery;
+	int nSets, nEquilSets, nStepsPerSet, printEvery;
 	int nDispAttempts, nVolAttempts, nSwapAttempts;
 	int* moves;
 	double rand;
@@ -27,7 +27,7 @@ int main(int argc, char** argv){
 	mc.InitialConfig();
 	nSets = mc.GetNSets();
 	nEquilSets = mc.GetNEquilSets();
-	nCyclesPerSet = mc.GetNCyclesPerSet();
+	nStepsPerSet = mc.GetNStepsPerSet();
 	printEvery = mc.GetPrintEvery();
 	moves = mc.GetMCMoves();
 	nDispAttempts = moves[0];
@@ -40,7 +40,7 @@ int main(int argc, char** argv){
 	for (int set=1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
-		for (int cycle=1; cycle<=nCyclesPerSet; cycle++){
+		for (int step=1; step<=nStepsPerSet; step++){
 			rand = mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts);
 			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.
 			else if (rand <= nDispAttempts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
@@ -57,7 +57,7 @@ int main(int argc, char** argv){
 			mc.PrintTrajectory(set);
 			mc.PrintLog(set);
 		}
-		//if (set <= nEquilSets) mc.AdjustMCMoves();
+		if (set <= nEquilSets) mc.AdjustMCMoves();
 	}
 	mc.PrintRDF();
 	return EXIT_SUCCESS;

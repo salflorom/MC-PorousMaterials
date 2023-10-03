@@ -3,6 +3,7 @@
 *.py
 *.log
 *.out
+*.csv
 output_*
 mcexecutable
 

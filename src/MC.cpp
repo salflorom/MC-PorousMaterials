@@ -25,7 +25,7 @@ MC::MC(void){
 	sim.rdf[0] = sim.rdf[1] = -1;
 	for (i=0; i<MAXBOX; i++) sim.dr[i] = 1;
 	sim.dv = 1e-3;
-	sim.nEquilSets = sim.nSets = sim.nCyclesPerSet = 0.;
+	sim.nEquilSets = sim.nSets = sim.nStepsPerSet = 0.;
 	sim.nDispAttempts = sim.nVolAttempts = sim.nSwapAttempts = 0;
 	thermoSys.temp = thermoSys.volume = thermoSys.press = -1.;
 	thermoSys.nBoxes = 0;
