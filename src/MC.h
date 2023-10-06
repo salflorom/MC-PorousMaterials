@@ -116,21 +116,31 @@ class MC {
 		int GetPrintEvery(void){return int(sim.printEvery);}
 
 		double NeighDistance(int, Particle, Particle);
+		double StepUnit(double, double, double);
 		// Fluid-Fluid potentials //
 		double HardSphere_Pot(int, int, int, int);
 		// Lennard-Jones 12-6 potential //
 		double LJ126_Pot(int, int, int, int);
-		// EAM Ga potential //
-		double* EAMGa_Pot(int, int, int, int);
-		double EAMGa_StepUnit(double, double, double);
-		double EAMGa_EmbPot(double);
-		double EAMGa_eDens(double);
-		double EAMGa_PairPot(double);
+		// EAM Na potential //
+		double* EAMNa_Pot(int, int, int, int);
+		double EAMNa_EmbPot(double);
+		double EAMNa_eDens(double);
+		double EAMNa_PairPot(double);
+		// EAM K potential //
+		double* EAMK_Pot(int, int, int, int);
+		double EAMK_EmbPot(double);
+		double EAMK_eDens(double);
+		double EAMK_PairPot(double);
 		// EAM Rb potential //
 		double* EAMRb_Pot(int, int, int, int);
 		double EAMRb_EmbPot(double);
 		double EAMRb_eDens(double);
 		double EAMRb_PairPot(double);
+		// EAM Ga potential //
+		double* EAMGa_Pot(int, int, int, int);
+		double EAMGa_EmbPot(double);
+		double EAMGa_eDens(double);
+		double EAMGa_PairPot(double);
 		// Fluid-Fluid potentials //
 
 		// Solid-Fluid potentials //

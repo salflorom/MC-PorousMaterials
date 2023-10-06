@@ -231,19 +231,19 @@ void MC::PrintStats(int set){
 	cout << setprecision(7);
 	if (set < sim.nEquilSets) cout << "Equilibrium set: " << set << endl;
 	else cout << "Set: " << set << endl;
-	if (sim.nVolAttempts > 0){
-		cout << "AcceptVolRatio; RejectVolRatio:\t";
-		cout << stats.acceptanceVol*1./stats.nVolChanges << "; ";
-		cout << stats.rejectionVol*1./stats.nVolChanges << endl;
-		if (set < sim.nEquilSets) cout << "Volume step size: " << sim.dv << endl;
-	}
-	if (sim.nSwapAttempts > 0){
-		cout << "AcceptSwapRatio; RejectSwapRatio:\t";
-		cout << stats.acceptSwap*1./stats.nSwaps << "; ";
-		cout << stats.rejectSwap*1./stats.nSwaps << endl;
-	}
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		cout << "Box " << box[i].name << ":" << endl;
+		if (sim.nVolAttempts > 0){
+			cout << "AcceptVolRatio; RejectVolRatio:\t";
+			cout << stats.acceptanceVol*1./stats.nVolChanges << "; ";
+			cout << stats.rejectionVol*1./stats.nVolChanges << endl;
+			if (set < sim.nEquilSets) cout << "Volume step size: " << sim.dv << endl;
+		}
+		if (sim.nSwapAttempts > 0){
+			cout << "AcceptSwapRatio; RejectSwapRatio:\t";
+			cout << stats.acceptSwap*1./stats.nSwaps << "; ";
+			cout << stats.rejectSwap*1./stats.nSwaps << endl;
+		}
 		if (stats.nDisplacements[i] > 0){
 			cout << "\tAcceptDispRatio; RegectDispRatio:\t";
 			cout << stats.acceptance[i]*1./stats.nDisplacements[i] << "; ";

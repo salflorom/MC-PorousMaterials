@@ -1,4 +1,12 @@
 //Author: Santiago A. Flores Roman
+// Note:
+// This file contains all fluid-fluid and solid-fluid potentials.
+// To add a new potential:
+// 1. Define the potential in this file.
+// 2. Declare the potential in MC.h.
+// 3. Add it in energy.cpp -> EnergyOfParticle(int, int, int),
+//    in its respective section: Particle-box enregy or Fluid-Fluid energy.
+//
 
 #include <cstring> // strlen
 #include <cmath> // pi, exp, round
@@ -22,6 +30,10 @@ double MC::NeighDistance(int ithBox, Particle ithPart, Particle jthPart){
 	if (box[ithBox].PBC[2]) dz -= round(dz/box[ithBox].width[2]) * box[ithBox].width[2]; //AA
 	dist = sqrt(dx*dx + dy*dy + dz*dz); //AA
 	return dist; //AA
+}
+double MC::StepUnit(double xValue, double leftLim, double rightLim){
+	if (leftLim <= xValue && xValue < rightLim) return 1.;
+	else return 0.;
 }
 
 // ---------- Fluid-Fluid potentials ---------- //
@@ -59,12 +71,233 @@ double MC::LJ126_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
 	}
 	return energy; //K
 }
+// EAM Na potential //
+// Important: This potential is still under test. It is not reliable yet!
+// Paper 1:
+// Belashchenko, D.K., 2012.
+// Electron Contribution to Energy of Alkali Metals in the Scheme of an Embedded Atom Model.
+// High Temp., 50(3), pp.331-339.
+// Paper 2:
+// Belashchenko, D.K., 2009. 
+// Application of the embedded atom model to liquid metals: Liquid sodium. 
+// High Temp., 47, pp.494-507.
+// Cut-off radius: 10.78 Angstrom.
+double* MC::EAMNa_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
+	Particle ithPart, jthPart;
+	static double energy[2];
+	double rij;
+	double rho=0, phiLow=0;
+	double eVToK = (801088317./5.0e27)/kb;
+
+	ithPart = box[ithBox].fluid[ithSpecies].particle[index];
+	for (int j=1; j<=box[ithBox].fluid[jthSpecies].nParts; j++){
+		jthPart = box[ithBox].fluid[jthSpecies].particle[j];
+		if (ithPart != jthPart){
+			rij = NeighDistance(ithBox, ithPart, jthPart);
+			if (rij <= 10.78){
+				rho += EAMNa_eDens(rij);
+				phiLow += EAMNa_PairPot(rij);
+			}
+		}
+	}
+	energy[0] = EAMNa_EmbPot(rho)*eVToK;
+	energy[1] = phiLow*eVToK;
+	return energy;
+}
+double MC::EAMNa_EmbPot(double rho){
+	Tools tls;
+	double rhoIntervals[10] = {1.00000,  0.90000,  0.800000,  0.700000,  0.620000,  0.280000,  0.050000,  0.030000,  1.400000,  0.000000};
+	double aValues[10]      = {0.00000, -0.33140, -0.329781, -0.328243, -0.331155, -0.331845, -0.216727,  0.194462,  0.253218, -0.305496};
+	double bValues[10]      = {0.00000,  0.00000, -0.032380,  0.001620,  0.056620, -0.039380, -0.637780, -2.937780, -2.937780,  0.129520};
+	double cValues[10]      = {0.00000,  0.16190, -0.170000, -0.275000,  0.600000,  0.880000,  5.000000,  0.000000,  0.000000, -0.150000};
+	double mValue=1.15, phi = 0;
+
+	if (rhoIntervals[1] <= rho && rho < rhoIntervals[8]) phi = aValues[1] + cValues[1]*tls.Pow(rho-rhoIntervals[0],2);
+	for (int i=2; i<8; i++){
+		if (rhoIntervals[i] <= rho && rho < rhoIntervals[i-1]){
+			phi = aValues[i] + bValues[i]*(rho-rhoIntervals[i-1]) + cValues[i]*tls.Pow(rho-rhoIntervals[i-1],2);
+			break;
+		}
+	}
+	if (rho < rhoIntervals[7]){
+		phi = aValues[8] + bValues[8]*(rho-rhoIntervals[7])+cValues[8]*tls.Pow(rho-rhoIntervals[7],2);
+		phi *= 2.*rho/rhoIntervals[5]-(rho/tls.Pow(rhoIntervals[5],2));
+	}
+	if (rho >= rhoIntervals[8]) phi = aValues[9] + bValues[9]*(rho-rhoIntervals[8]) + cValues[9]*pow(rho-rhoIntervals[8],mValue);
+	return phi;
+}
+double MC::EAMNa_eDens(double radius){
+	double pValues[3] = {0, 3.4418, 1.0245};
+	return pValues[1]*exp(-pValues[2]*radius);
+}
+double MC::EAMNa_PairPot(double radius){
+	Tools tls;
+	double phi;
+	double rIntervals[12]= {0.0, 2.55, 2.80, 2.95, 3.45, 3.95, 4.45, 4.95, 5.45, 5.95, 7.45, 10.78};
+	double bValues[12][7]= {{ 0.00000000000,  0.0000000000,  00.00000000000,  000.00000000000,  0000.00000000000,  0000.00000000000,  00.00000000000},
+							{ 0.00000000000,  0.0000000000,  00.00000000000,  000.00000000000,  0000.00000000000,  0000.00000000000,  00.00000000000},
+							{ 0.35805506000, -2.8231320000,  12.57403700000,  324.38852000000,  1675.13890000000,  2599.46790000000,  00.00000000000},
+							{ 0.12708218000, -0.7885621800,  01.46133970000, -023.64693200000,  0000.00000000000,  0000.00000000000,  00.00000000000},
+							{-0.11093583000, -0.3013956200, -00.57444694000, -007.67105920000, -0029.51319800000, -0053.35320300000, -35.24244200000},
+							{-0.18380286000, -0.0312040760,  00.66662912000,  004.86362490000,  0020.31048900000,  0037.53878100000,  25.74349800000},
+							{-0.17446597000,  0.0949913110,  00.61158912000,  003.82919210000,  0012.55137100000,  0018.51867900000,  10.12214300000},
+							{-0.13020295000,  0.0879272820, -00.56735449000, -005.27961900000, -0019.75187800000, -0033.86296700000, -21.89686400000},
+							{-0.07368651000,  0.1322006400,  00.75321670000,  006.82070260000,  0026.09383900000,  0045.49814000000,  29.74844400000},
+							{-0.02636867600,  0.0793784780, -00.07650342800, -000.64246319000, -0003.66128030000, -0008.76413680000, -07.28703330000},
+							{ 0.02854006900, -0.0019879458,  00.00569042080,  000.08022363800,  0000.09918809300,  0000.06169853000,  00.01461238100},
+							{ 0.73629497e-4,  0.0000000000, -00.40257317e-2, -000.52993510e-2, -0000.16744300e-2, -0000.42268470e-3, -00.65802071e-4}};
+
+	if (rIntervals[0] <= radius && radius <= rIntervals[1]) phi = 0.786149*exp(1.2*(2.55-radius));
+	else{
+		for (int m=2; m<12; m++){
+			if (rIntervals[m-1] < radius && radius <= rIntervals[m]){
+				phi = 0;
+				for (int n=0; n<7; n++) phi += bValues[m][n]*tls.Pow(radius-rIntervals[m],n);
+				break;
+			}
+		}
+	}
+	return phi;
+}
+// EAM K potential //
+// Paper:
+// Belashchenko, D.K., 2012.
+// Electron Contribution to Energy of Alkali Metals in the Scheme of an Embedded Atom Model.
+// High Temp., 50(3), pp.331-339.
+// Cut-off radius: 9.57 Angstrom.
+double* MC::EAMK_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
+	Particle ithPart, jthPart;
+	static double energy[2];
+	double rij;
+	double rho=0, phiLow=0;
+	double eVToK = (801088317./5.0e27)/kb;
+
+	ithPart = box[ithBox].fluid[ithSpecies].particle[index];
+	for (int j=1; j<=box[ithBox].fluid[jthSpecies].nParts; j++){
+		jthPart = box[ithBox].fluid[jthSpecies].particle[j];
+		if (ithPart != jthPart){
+			rij = NeighDistance(ithBox, ithPart, jthPart);
+			if (rij <= 9.57){
+				rho += EAMK_eDens(rij);
+				phiLow += EAMK_PairPot(rij);
+			}
+		}
+	}
+	energy[0] = EAMK_EmbPot(rho)*eVToK;
+	energy[1] = phiLow*eVToK;
+	return energy;
+}
+double MC::EAMK_EmbPot(double rho){
+	Tools tls;
+	double rhoIntervals[8] = {1.00000,  0.86000,  0.760000,  0.560000,  0.440000,  0.280000,  1.150000,  0.000000};
+	double aValues[8]      = {0.00000, -0.24030, -0.237254, -0.241903, -0.250201, -0.238019, -0.206929, -0.236804};
+	double bValues[8]      = {0.00000,  0.00000, -0.043512,  0.136488, -0.053512, -0.149512, -0.239112,  0.046620};
+	double cValues[8]      = {0.00000,  0.15540, -0.900000,  0.475000,  0.400000,  0.280000, -1.200000,  0.072000};
+	double phi = 0;
+	int mValue = 2;
+
+	if (rhoIntervals[1] <= rho && rho < rhoIntervals[6]) phi = aValues[1] + cValues[1]*tls.Pow(rho-rhoIntervals[0],2);
+	for (int i=2; i<6; i++){
+		if (rhoIntervals[i] <= rho && rho < rhoIntervals[i-1]){
+			phi = aValues[i] + bValues[i]*(rho-rhoIntervals[i-1]) + cValues[i]*tls.Pow(rho-rhoIntervals[i-1],2);
+			break;
+		}
+	}
+	if (rho < rhoIntervals[5]){
+		phi = aValues[6] + bValues[6]*(rho-rhoIntervals[5]) + cValues[6]*tls.Pow(rho-rhoIntervals[5],2);
+	}
+	if (rho >= rhoIntervals[6]){
+		phi = aValues[7] + bValues[7]*(rho-rhoIntervals[6]) + cValues[7]*tls.Pow(rho-rhoIntervals[6], mValue);
+	}
+	return phi;
+}
+double MC::EAMK_eDens(double radius){
+	double pValues[3] = {0, 3.7461, 0.8400};
+	return pValues[1]*exp(-pValues[2]*radius);
+}
+double MC::EAMK_PairPot(double radius){
+	Tools tls;
+	double phi=0.;
+
+	if (radius > 3.6){
+		phi  = -0.84432914577684e2                   + 0.16516874958198e4/radius            - 0.18050026911001e5/tls.Pow(radius,2);
+		phi +=  0.12158970338571e6/tls.Pow(radius,3) - 0.52145119211160e6/tls.Pow(radius,4) + 0.13954378228164e7/tls.Pow(radius, 5);
+		phi += -0.21278483968480e7/tls.Pow(radius,6) + 0.14119174994173e7/tls.Pow(radius,7) + 0.18351869172267e1*radius;
+	}else phi = 0.183253 + 0.201781*(3.60-radius) + 0.14*(exp(1.96*(3.60-radius)) - 1);
+	return phi;
+}
+// EAM Rb potential //
+// Paper:
+// Belashchenko, D.K., 2012.
+// Electron Contribution to Energy of Alkali Metals in the Scheme of an Embedded Atom Model.
+// High Temp., 50(3), pp.331-339.
+// Cut-off radius: 14.35 Angstrom.
+double* MC::EAMRb_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
+	Particle ithPart, jthPart;
+	static double energy[2];
+	double rij;
+	double rho=0, phiLow=0;
+	double eVToK = (801088317./5.0e27)/kb;
+
+	ithPart = box[ithBox].fluid[ithSpecies].particle[index];
+	for (int j=1; j<=box[ithBox].fluid[jthSpecies].nParts; j++){
+		jthPart = box[ithBox].fluid[jthSpecies].particle[j];
+		if (ithPart != jthPart){
+			rij = NeighDistance(ithBox, ithPart, jthPart);
+			if (rij <= 14.35){ //Cut-off radius is 14.35 AA.
+				rho += EAMRb_eDens(rij);
+				phiLow += EAMRb_PairPot(rij);
+			}
+		}
+	}
+	energy[0] = EAMRb_EmbPot(rho)*eVToK;
+	energy[1] = phiLow*eVToK;
+	return energy;
+}
+double MC::EAMRb_EmbPot(double rho){
+	Tools tls;
+	double rhoIntervals[8] = {1.00000,  0.90000,  0.760000,  0.650000,  0.500000,  0.280000,  1.450000,  0.000000};
+	double aValues[8]      = {0.00000, -0.39630, -0.395189, -0.394587, -0.390822, -0.367575, -0.192569, -0.373802};
+	double bValues[8]      = {0.00000,  0.00000, -0.022220,  0.013620, -0.082080, -0.227880, -1.363080,  0.099990};
+	double cValues[8]      = {0.00000,  0.11110, -0.128000,  0.435000,  0.486000,  2.580000,  1.200000,  0.045000};
+	double mValue=1.5, phi=0;
+
+	if (rhoIntervals[1] <= rho && rho < rhoIntervals[6]) phi = aValues[1] + cValues[1]*tls.Pow(rho-rhoIntervals[0],2);
+	for (int i=2; i<6; i++){
+		if (rhoIntervals[i] <= rho && rho < rhoIntervals[i-1]){
+			phi = aValues[i] + bValues[i]*(rho-rhoIntervals[i-1]) + cValues[i]*tls.Pow(rho-rhoIntervals[i-1],2);
+			break;
+		}
+	}
+	if (rho < rhoIntervals[5]){
+		phi = aValues[6] + bValues[6]*(rho-rhoIntervals[5]) + cValues[6]*tls.Pow(rho-rhoIntervals[5],2);
+	}
+	if (rho >= rhoIntervals[6]){
+		phi = aValues[7] + bValues[7]*(rho-rhoIntervals[6]) + cValues[7]*pow(rho-rhoIntervals[6], mValue);
+	}
+	return phi;
+}
+double MC::EAMRb_eDens(double radius){
+	double pValues[3] = {0, 4.4417, 0.8192};
+	return pValues[1]*exp(-pValues[2]*radius);
+}
+double MC::EAMRb_PairPot(double radius){
+	Tools tls;
+	double phi=0.;
+
+	if (radius > 3.7){
+		phi  =  0.31906474916390e2           - 0.81743392122167e3/radius    + 0.11276093229851e5/tls.Pow(radius,2);
+		phi += -0.91581958116768e5/tls.Pow(radius,3) + 0.45029175720846e6/tls.Pow(radius,4) - 0.13200477580999e7/tls.Pow(radius,5);
+		phi +=  0.21301998697094e7/tls.Pow(radius,6) - 0.14604995446672e7/tls.Pow(radius,7) - 0.51504928921871*radius;
+	}else phi = 0.132908 + 0.040299*(3.70-radius) + 0.15*(exp(1.96*(3.70-radius)) - 1);
+	return phi;
+}
 // EAM Ga potential //
 // Paper:
 // Belashchenko, D.K., 2012.
 // Computer Simulation of the Properties of Liquid Metals: Gallium, Lead, and Bismuth.
 // Russ. J. Phys. Chem. A, 86, pp.779-790.
-// Cut=off radius: 8.3 Angstrom.
+// Cut-off radius: 8.3 Angstrom.
 double* MC::EAMGa_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
 	Particle ithPart, jthPart;
 	static double energy[2];
@@ -87,10 +320,6 @@ double* MC::EAMGa_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
 	energy[1] = phiLow*eVToK;
 	return energy;
 }
-double MC::EAMGa_StepUnit(double radius, double leftLim, double rightLim){
-	if (leftLim <= radius && radius < rightLim) return 1.;
-	else return 0.;
-}
 double MC::EAMGa_EmbPot(double rho){
 	double rhoIntervals[7] = {1.00000,  0.92000,  0.870000,  0.800000,  0.750000,  0.650000,  1.400000};
 	double aValues[7]      = {0.00000, -1.91235, -1.904030, -1.897380, -1.883520, -1.852620, -1.822820};
@@ -112,7 +341,6 @@ double MC::EAMGa_EmbPot(double rho){
 }
 double MC::EAMGa_eDens(double radius){
 	double pValues[3] = {0, 2.24450, 1.2};
-
 	return pValues[1]*exp(-pValues[2]*radius);
 }
 double MC::EAMGa_PairPot(double radius){
@@ -131,298 +359,11 @@ double MC::EAMGa_PairPot(double radius){
 	if (rIntervals[1] < radius && radius <= rIntervals[6]){
 		for (int i=1; i<6; i++){
 			for (int m=0; m<9; m++){
-				phi += aValues[m][i] * pow((radius-rIntervals[i+1]),m) * EAMGa_StepUnit(radius, rIntervals[i], rIntervals[i+1]);
+				phi += aValues[m][i] * pow((radius-rIntervals[i+1]),m) * StepUnit(radius, rIntervals[i], rIntervals[i+1]);
 			}
 		}
 	}else if (rIntervals[0] < radius && radius <= rIntervals[1]){
 		phi = 0.619588 - 51.86268*(2.15-radius) + 27.8*(exp(1.96*(2.15-radius))-1);
-	}
-	return phi;
-}
-// EAM Rb potential //
-// Paper:
-// Belashchenko, D.K., 2006.
-// Embedded Atom Model Application to Liquid Metals: Liquid rubidium.
-// Russ. J. Phys. Chem., 80(10), pp.1567-1577.
-// Available interval (K): (313, 2000).
-// Cut-off radius: 14.35 Angstrom.
-double* MC::EAMRb_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
-	Particle ithPart, jthPart;
-	static double energy[2];
-	double rij, rcut;
-	double rho=0, phiLow=0;
-	double eVToK = (801088317./5.0e27)/kb;
-
-	ithPart = box[ithBox].fluid[ithSpecies].particle[index];
-	rcut = fluid[ithSpecies].rcut[jthSpecies]; // AA
-	for (int j=1; j<=box[ithBox].fluid[jthSpecies].nParts; j++){
-		jthPart = box[ithBox].fluid[jthSpecies].particle[j];
-		if (ithPart != jthPart){
-			rij = NeighDistance(ithBox, ithPart, jthPart);
-			if (rij <= 14.35){ //Cut-off radius is 14.35 AA.
-				rho += EAMRb_eDens(rij);
-				phiLow += EAMRb_PairPot(rij);
-			}
-		}
-	}
-	energy[0] = EAMRb_EmbPot(rho)*eVToK;
-	energy[1] = phiLow*eVToK;
-	return energy;
-}
-double MC::EAMRb_EmbPot(double rho){
-	Tools tls;
-	double rhoIntervals[2] = { 1.000000,  0.900000};
-	double aValues[4]      = { 0.000000, -0.406100,  0.111100, -0.008000};
-	double bValues[4]      = {-0.404981, -0.022460, -0.091400, -0.860667};
-	double temp = thermoSys.temp;
-	double phi = 0;
-
-	if (rho >= rhoIntervals[1]) phi = aValues[1] + aValues[2]*tls.Pow(rho-rhoIntervals[0],2) + aValues[3]*tls.Pow(rho-rhoIntervals[0],3);
-	else phi = bValues[0] + bValues[1]*(rho-rhoIntervals[1]) + bValues[2]*tls.Pow(rho-rhoIntervals[1],2) + bValues[3]*(rho-rhoIntervals[1],3);
-	return phi;
-}
-double MC::EAMRb_eDens(double radius){
-	double pValues[3] = {0, 4.4400, 0.8192};
-	double temp = thermoSys.temp;
-
-	return pValues[1]*exp(-pValues[2]*radius);
-}
-double MC::EAMRb_PairPot(double radius){
-	int ithRadius;
-	double schommers[227][2] = {{3.100,  3.4941300e+00},
-								{3.150,  3.1969900e+00},
-								{3.200,  2.9268800e+00},
-								{3.250,  1.0476900e+00},
-								{3.300,  4.3920000e-01},
-								{3.350,  4.0885000e-01},
-								{3.400,  2.5805000e-01},
-								{3.450,  2.4818000e-01},
-								{3.500,  2.3567000e-01},
-								{3.550,  2.0578000e-01},
-								{3.600,  1.7769100e-01},
-								{3.650,  1.8910700e-01},
-								{3.700,  1.3265600e-01},
-								{3.750,  1.1538400e-01},
-								{3.800,  1.1373200e-01},
-								{3.850,  7.2463100e-02},
-								{3.900,  7.1904900e-02},
-								{3.950,  5.0585800e-02},
-								{4.000,  4.3854200e-02},
-								{4.050,  3.6086500e-02},
-								{4.100,  2.4898800e-02},
-								{4.150,  1.3997300e-02},
-								{4.200,  3.8783100e-02},
-								{4.250, -5.3519100e-02},
-								{4.300, -1.3902700e-02},
-								{4.350, -2.2013100e-02},
-								{4.400, -2.9561700e-02},
-								{4.450, -3.7592700e-02},
-								{4.500, -4.4626000e-02},
-								{4.550, -5.0976600e-02},
-								{4.600, -5.6596800e-02},
-								{4.650, -6.0931100e-02},
-								{4.700, -6.5009900e-02},
-								{4.750, -6.8162600e-02},
-								{4.800, -7.1236600e-02},
-								{4.850, -7.3332400e-02},
-								{4.900, -7.5456500e-02},
-								{4.950, -7.6865200e-02},
-								{5.000, -7.7807600e-02},
-								{5.050, -7.8660000e-02},
-								{5.100, -7.9080200e-02},
-								{5.150, -7.9317100e-02},
-								{5.200, -7.9670000e-02},
-								{5.250, -7.9706300e-02},
-								{5.300, -7.9241500e-02},
-								{5.350, -7.8614900e-02},
-								{5.400, -7.8224900e-02},
-								{5.450, -7.7142900e-02},
-								{5.500, -7.6468700e-02},
-								{5.550, -7.5162300e-02},
-								{5.600, -7.3925900e-02},
-								{5.650, -7.2673800e-02},
-								{5.700, -7.1144000e-02},
-								{5.750, -6.9688000e-02},
-								{5.800, -6.8014100e-02},
-								{5.850, -6.6102400e-02},
-								{5.900, -6.4178600e-02},
-								{5.950, -6.2284600e-02},
-								{6.000, -5.9969600e-02},
-								{6.050, -5.7450800e-02},
-								{6.100, -5.5560500e-02},
-								{6.150, -5.3395500e-02},
-								{6.200, -5.1058600e-02},
-								{6.250, -4.8689900e-02},
-								{6.300, -4.6535000e-02},
-								{6.350, -4.4248000e-02},
-								{6.400, -4.2408300e-02},
-								{6.450, -4.0071100e-02},
-								{6.500, -3.8135600e-02},
-								{6.550, -3.6491700e-02},
-								{6.600, -3.3512900e-02},
-								{6.650, -3.2244700e-02},
-								{6.700, -3.0038100e-02},
-								{6.750, -2.7806600e-02},
-								{6.800, -2.5773500e-02},
-								{6.850, -2.4274600e-02},
-								{6.900, -2.2814200e-02},
-								{6.950, -2.1176500e-02},
-								{7.000, -1.9699200e-02},
-								{7.050, -1.7650100e-02},
-								{7.100, -1.6637200e-02},
-								{7.150, -1.5166500e-02},
-								{7.200, -1.3816800e-02},
-								{7.250, -1.2044100e-02},
-								{7.300, -1.0851200e-02},
-								{7.350, -9.4040900e-03},
-								{7.400, -8.2554000e-03},
-								{7.450, -6.9271000e-03},
-								{7.500, -5.9576500e-03},
-								{7.550, -4.4748000e-03},
-								{7.600, -3.4041900e-03},
-								{7.650, -2.4339400e-03},
-								{7.700, -1.1721200e-03},
-								{7.750, -1.8191700e-04},
-								{7.800,  5.7357900e-04},
-								{7.850,  1.7539600e-03},
-								{7.900,  2.5720000e-03},
-								{7.950,  3.6192400e-03},
-								{8.000,  4.3219700e-03},
-								{8.050,  5.0186600e-03},
-								{8.100,  5.8141600e-03},
-								{8.150,  6.2828800e-03},
-								{8.200,  6.9115300e-03},
-								{8.250,  7.7310300e-03},
-								{8.300,  8.1589900e-03},
-								{8.350,  8.5557300e-03},
-								{8.400,  8.8646100e-03},
-								{8.450,  9.0379500e-03},
-								{8.500,  9.7870000e-03},
-								{8.550,  9.7653700e-03},
-								{8.600,  9.7845800e-03},
-								{8.650,  9.9648200e-03},
-								{8.700,  9.9365600e-03},
-								{8.750,  1.0061700e-02},
-								{8.800,  1.0227500e-02},
-								{8.850,  9.7450200e-03},
-								{8.900,  1.0036300e-02},
-								{8.950,  9.7751900e-03},
-								{9.000,  9.6744300e-03},
-								{9.050,  9.4183200e-03},
-								{9.100,  9.5039600e-03},
-								{9.150,  9.0345800e-03},
-								{9.200,  8.8524100e-03},
-								{9.250,  8.7414900e-03},
-								{9.300,  8.3813500e-03},
-								{9.350,  8.1424700e-03},
-								{9.400,  7.7455200e-03},
-								{9.450,  7.3538000e-03},
-								{9.500,  7.0507100e-03},
-								{9.550,  6.4152900e-03},
-								{9.600,  6.5860400e-03},
-								{9.650,  6.2360200e-03},
-								{9.700,  6.0886700e-03},
-								{9.750,  5.7449800e-03},
-								{9.800,  5.6021200e-03},
-								{9.850,  5.1657900e-03},
-								{9.900,  5.0184900e-03},
-								{9.950,  4.6897100e-03},
-								{10.00,  4.4517000e-03},
-								{10.05,  4.0207800e-03},
-								{10.10,  3.5952500e-03},
-								{10.15,  3.4573800e-03},
-								{10.20,  3.2455500e-03},
-								{10.25,  2.8338800e-03},
-								{10.30,  2.6146600e-03},
-								{10.35,  2.3418200e-03},
-								{10.40,  1.7358700e-03},
-								{10.45,  1.6351600e-03},
-								{10.50,  1.1644800e-03},
-								{10.55,  1.0370600e-03},
-								{10.60,  6.9196700e-04},
-								{10.65,  3.9450400e-04},
-								{10.70,  2.9390300e-05},
-								{10.75, -2.3650500e-04},
-								{10.80, -7.2125300e-04},
-								{10.85, -8.0213800e-04},
-								{10.90, -1.0311700e-03},
-								{10.95, -1.2667200e-03},
-								{11.00, -1.6033000e-03},
-								{11.05, -1.6252600e-03},
-								{11.10, -2.0686100e-03},
-								{11.15, -2.1527400e-03},
-								{11.20,  2.3679000e-03},
-								{11.25, -2.5607600e-03},
-								{11.30, -2.9458900e-03},
-								{11.35, -2.6662500e-03},
-								{11.40, -2.8480300e-03},
-								{11.45, -2.8798400e-03},
-								{11.50, -2.9133600e-03},
-								{11.55, -3.0798100e-03},
-								{11.60, -3.1140600e-03},
-								{11.65, -3.1287200e-03},
-								{11.70, -3.0777100e-03},
-								{11.75, -3.3027200e-03},
-								{11.80, -3.0491700e-03},
-								{11.85, -3.4808900e-03},
-								{11.90, -3.0896200e-03},
-								{11.95, -3.1461600e-03},
-								{12.00, -3.1636700e-03},
-								{12.05, -3.1591900e-03},
-								{12.10, -3.1163800e-03},
-								{12.15, -3.1804400e-03},
-								{12.20, -2.9218900e-03},
-								{12.25, -3.0356500e-03},
-								{12.30, -3.0122500e-03},
-								{12.35, -3.0819500e-03},
-								{12.40, -2.9736600e-03},
-								{12.45, -2.8802200e-03},
-								{12.50, -2.9095500e-03},
-								{12.55, -2.6343300e-03},
-								{12.60, -2.7071100e-03},
-								{12.65, -2.5578300e-03},
-								{12.70, -2.4176500e-03},
-								{12.75, -2.1604100e-03},
-								{12.80, -2.3342100e-03},
-								{12.85, -1.9505500e-03},
-								{12.90, -2.1415200e-03},
-								{12.95, -1.9726900e-03},
-								{13.00, -1.7187300e-03},
-								{13.05, -1.8171600e-03},
-								{13.10, -1.7118400e-03},
-								{13.15, -1.6313200e-03},
-								{13.20, -1.4445300e-03},
-								{13.25, -1.4670200e-03},
-								{13.30, -1.2981000e-03},
-								{13.35, -1.4856900e-03},
-								{13.40, -1.1247700e-03},
-								{13.45, -1.1761600e-03},
-								{13.50, -1.0486000e-03},
-								{13.55, -8.7051200e-04},
-								{13.60, -7.7697900e-04},
-								{13.65, -7.5154700e-04},
-								{13.70, -8.1809500e-04},
-								{13.75, -5.9900800e-04},
-								{13.80, -6.8876100e-04},
-								{13.85, -4.6956400e-04},
-								{13.90, -4.3730600e-04},
-								{13.95, -3.8378500e-04},
-								{14.00, -3.0979800e-04},
-								{14.05, -3.0162700e-04},
-								{14.10, -2.6248900e-04},
-								{14.15, -2.3979500e-04},
-								{14.20, -1.7069100e-04},
-								{14.25, -1.3420600e-04},
-								{14.30,  1.0163200e-04},
-								{14.35,  1.0163200e-04},
-								{14.40,  1.0163200e-04}};
-	double phi=0.;
-
-	// y = y1 + (x-x1)(y2-y1)/(x2-x1)
-	if (radius < 3.1) phi = 1e10;
-	else{
-		ithRadius = int((radius-3.10)/0.05);
-		phi = schommers[ithRadius][1] + (radius-schommers[ithRadius][0])*(schommers[ithRadius+1][1]-schommers[ithRadius][1])/(schommers[ithRadius+1][0]-schommers[ithRadius][0]);
 	}
 	return phi;
 }

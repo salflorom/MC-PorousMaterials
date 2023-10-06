@@ -78,12 +78,20 @@ void MC::EnergyOfParticle(int ithBox, int ithSpecies, int index){
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += LJ126_Pot(ithBox, ithSpecies, jthSpecies, index);
 		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "hs"){
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += HardSphere_Pot(ithBox, ithSpecies, jthSpecies, index);
-		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_ga"){ //EAM potential for Ga.
-			tmp = EAMGa_Pot(ithBox, ithSpecies, jthSpecies, index);
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_na"){ //EAM potential for Na.
+			tmp = EAMNa_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_k"){ //EAM potential for K.
+			tmp = EAMK_Pot(ithBox, ithSpecies, jthSpecies, index);
 			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
 		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_rb"){ //EAM potential for Rb.
 			tmp = EAMRb_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_ga"){ //EAM potential for Ga.
+			tmp = EAMGa_Pot(ithBox, ithSpecies, jthSpecies, index);
 			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
 		}
