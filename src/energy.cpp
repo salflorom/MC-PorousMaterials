@@ -4,6 +4,7 @@
 #include <iostream> // cout
 #include <climits> // INT_MAX
 #include <cmath> // isnan
+#include <omp.h>
 
 #include "MC.h"
 #include "tools.h"
@@ -13,8 +14,10 @@ using namespace std;
 void MC::MinimizeEnergy(void){
 	int initMoves = 200;
 
+	#pragma omp parallel for
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		if (box[i].nParts > 0){
+			#pragma omp critical
 			cout << "Minimizing initial configuration of box \"" << box[i].name << "\"..."<< endl;
 			BoxEnergy(i);
 			cout << "\tEnergy/part. of box \"" << box[i].name << "\" before minimization: ";
@@ -27,7 +30,6 @@ void MC::MinimizeEnergy(void){
 			cout << "\tEnergy/part. of box \"" << box[i].name << "\" after minimization (";
 			cout << box[i].nParts*initMoves << " moves): ";
 			cout << box[i].energy/box[i].nParts << " K" << endl;
-			cout << endl;
 		}
 	}
 }

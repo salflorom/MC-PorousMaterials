@@ -61,21 +61,25 @@ void MC::InitialConfig(void){
 	cout << "Initial configuration set." << endl;
 	cout << endl;
 }
-void MC::AdjustMCMoves(void){
+void MC::AdjustMCMoves(int set){
 	double ratio;
 
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		if (box[i].nParts > 0){
-			ratio = stats.acceptance[i]*1./(1.*stats.nDisplacements[i]);
-			if (ratio < 0.2) sim.dr[i] /= 1.1;
-			else sim.dr[i] *= 1.1;
+			// Adjust displacement.
+			if (set <= sim.nEquilSets){
+				ratio = stats.acceptance[i]*1./(1.*stats.nDisplacements[i]);
+				if (ratio < 0.2) sim.dr[i] /= 1.1;
+				else sim.dr[i] *= 1.1;
+			}
+			// Adjust volume change.
+			if (sim.nVolAttempts > 0){
+				ratio = stats.acceptanceVol[i]*1./(1.*stats.nVolChanges);
+				if (ratio < 0.5 && sim.dv[i] > 1e-3) sim.dv[i] /= 1.1;
+				else sim.dv[i] *= 1.1;
+			}
 		}
 	}
-	//if (sim.nVolAttempts > 0){
-		//ratio = stats.acceptanceVol*1./(1.*stats.nVolChanges);
-		//if (ratio < 0.3) sim.dv /= 1.1;
-		//else sim.dv *= 1.1;
-	//}
 }
 void MC::RescaleCenterOfMass(Box oldBox, Box& newBox, int ithBox){
 	Tools tls;
@@ -105,7 +109,7 @@ void MC::RescaleCenterOfMass(Box oldBox, Box& newBox, int ithBox){
 		}
 	}
 	sim.dr[ithBox] *= ratio;
-	//sim.dv *= ratio;
+	sim.dv[ithBox] *= ratio;
 }
 void MC::MoveParticle(void){
 	Particle ithPart;
@@ -119,6 +123,7 @@ void MC::MoveParticle(void){
 	// Select particle.
 	rand = int(Random()*thermoSys.nParts);
 	tmp = 0;
+	ithBox = 0;
 	for (i=0; i<thermoSys.nBoxes; i++){
 		tmp += box[i].nParts;
 		if (rand <= tmp){
@@ -128,6 +133,7 @@ void MC::MoveParticle(void){
 	}
 	rand = int(Random()*box[ithBox].nParts);
 	tmp = 0;
+	ithSpecies = 0;
 	for (i=0; i<thermoSys.nSpecies; i++){
 		tmp += box[ithBox].fluid[i].nParts;
 		if (rand <= tmp){
@@ -181,6 +187,7 @@ void MC::MoveParticle(void){
 void MC::ChangeVolume(void){
 	Box oldBox0, oldBox1;
 	int ithBox;
+	double olddv[2];
 	double deltaE0, deltaE1;
 	double logNewVol, deltaVol0;
 	double arg0, arg1;
@@ -193,7 +200,8 @@ void MC::ChangeVolume(void){
 			ithBox = round(Random()*thermoSys.nBoxes);
 		}while (box[ithBox].fix);
 		oldBox0 = box[ithBox]; // Record old information.
-		logNewVol = log(box[ithBox].volume) + (Random()-0.5)*sim.dv; //Perform volume change step.
+		olddv[ithBox] = sim.dv[ithBox];
+		logNewVol = log(box[ithBox].volume) + (Random()-0.5)*sim.dv[ithBox]; //Perform volume change step.
 		box[ithBox].volume = exp(logNewVol);
 		RescaleCenterOfMass(oldBox0, box[ithBox], ithBox); //Rescale to trial config.
 		// Set box sizes according to trial volume.
@@ -209,20 +217,23 @@ void MC::ChangeVolume(void){
 		deltaVol0 = box[ithBox].volume-oldBox0.volume;
 		arg0 = deltaE0 + extPress*deltaVol0 - (box[ithBox].nParts+1)*log(box[ithBox].volume/oldBox0.volume)*thermoSys.temp;
 		if (Random() > exp(-arg0/thermoSys.temp)){ //Rejected trial move.
-			stats.rejectionVol++;
+			stats.rejectionVol[ithBox]++;
 			box[ithBox] = oldBox0;
+			sim.dv[ithBox] = olddv[ithBox];
 		}else{ // Accepted trial move. Keep trial config.
-			stats.acceptanceVol++;
+			stats.acceptanceVol[ithBox]++;
 			thermoSys.volume += deltaVol0;
 		}
 	}else{ // Gibbs-NVT ensemble.
 		oldBox0 = box[0]; // Record old information.
 		oldBox1 = box[1];
-		logNewVol = log(box[0].volume/box[1].volume) + (Random()-0.5)*sim.dv; //Perform volume change step.
+		olddv[0] = sim.dv[0];
+		olddv[1] = sim.dv[1];
+		logNewVol = log(box[0].volume/box[1].volume) + (Random()-0.5)*sim.dv[0]; //Perform volume change step.
 		box[0].volume = thermoSys.volume*exp(logNewVol)/(1+exp(logNewVol));
 		box[1].volume = thermoSys.volume-box[0].volume;
-		RescaleCenterOfMass(oldBox0, box[0], ithBox); //Rescale to trial config.
-		RescaleCenterOfMass(oldBox1, box[1], ithBox); //Rescale to trial config.
+		RescaleCenterOfMass(oldBox0, box[0], 0); //Rescale to trial config.
+		RescaleCenterOfMass(oldBox1, box[1], 1); //Rescale to trial config.
 		// Set box sizes according to trial volume.
 		box[0].width[2] = ComputeBoxWidth(box[0], box[0].volume);
 		box[0].width[0] = box[0].width[1] = box[0].width[2];
@@ -236,10 +247,16 @@ void MC::ChangeVolume(void){
 		arg0 = deltaE0 + (box[0].nParts+1)*log(box[0].volume/oldBox0.volume)*thermoSys.temp;
 		arg1 = deltaE1 + (box[1].nParts+1)*log(box[1].volume/oldBox1.volume)*thermoSys.temp;
 		if (Random() > exp(-(arg0+arg1)/thermoSys.temp)){ //Rejected trial move.
-			stats.rejectionVol++;
+			stats.rejectionVol[0]++;
+			stats.rejectionVol[1]++;
 			box[0] = oldBox0;
 			box[1] = oldBox1;
-		}else stats.acceptanceVol++; // Accepted trial move. Keep trial config.
+			sim.dv[0] = olddv[0];
+			sim.dv[1] = olddv[1];
+		}else{ // Accepted trial move. Keep trial config.
+			stats.acceptanceVol[0]++;
+			stats.acceptanceVol[1]++;
+		}
 	}
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		if (box[i].geometry == "bulk" && box[i].width[2] < box[i].maxRcut){
@@ -263,6 +280,7 @@ void MC::SwapParticle(void){
 	if (thermoSys.nBoxes == 1){
 		rand = int(Random()*box[0].nParts);
 		tmp = 0;
+		ithSpecies = 0;
 		for (int i=0; i<thermoSys.nSpecies; i++){
 			tmp += box[0].fluid[i].nParts;
 			if (rand <= tmp){
@@ -329,6 +347,7 @@ void MC::SwapParticle(void){
 		if (box[outBox].nParts > 0){
 			rand = int(Random()*box[inBox].nParts);
 			tmp = 0;
+			ithSpecies = 0;
 			for (int i=0; i<thermoSys.nSpecies; i++){
 				tmp += box[inBox].fluid[i].nParts;
 				if (rand <= tmp){

@@ -33,14 +33,15 @@ class MC {
 
 		struct Stats{
 			int acceptance[MAXBOX], rejection[MAXBOX], nDisplacements[MAXBOX];
-			int acceptanceVol, rejectionVol, nVolChanges;
+			int acceptanceVol[MAXBOX], rejectionVol[MAXBOX], nVolChanges;
 			int acceptSwap, rejectSwap, nSwaps;
 			int widomInsertions[MAXBOX];
 			double binWidth, widom[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
+			bool printTrajectory;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
-			double dr[MAXBOX], dv;
+			double dr[MAXBOX], dv[MAXBOX];
 			int nDispAttempts, nSwapAttempts, nVolAttempts;
 			int cycle, rdf[2];
 			string projName;
@@ -88,7 +89,7 @@ class MC {
 		void InsertParticle(int, int, int);
 		void InitialConfig(void);
 		void MinimizeEnergy(void);
-		void AdjustMCMoves(void);
+		void AdjustMCMoves(int);
 		void MoveParticle(void);
 		void ChangeVolume(void);
 		void RescaleCenterOfMass(Box, Box&, int);

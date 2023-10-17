@@ -78,8 +78,8 @@ double MC::LJ126_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
 // Electron Contribution to Energy of Alkali Metals in the Scheme of an Embedded Atom Model.
 // High Temp., 50(3), pp.331-339.
 // Paper 2:
-// Belashchenko, D.K., 2009. 
-// Application of the embedded atom model to liquid metals: Liquid sodium. 
+// Belashchenko, D.K., 2009.
+// Application of the embedded atom model to liquid metals: Liquid sodium.
 // High Temp., 47, pp.494-507.
 // Cut-off radius: 10.78 Angstrom.
 double* MC::EAMNa_Pot(int ithBox, int ithSpecies, int jthSpecies, int index){
@@ -132,7 +132,7 @@ double MC::EAMNa_eDens(double radius){
 }
 double MC::EAMNa_PairPot(double radius){
 	Tools tls;
-	double phi;
+	double phi = 0;
 	double rIntervals[12]= {0.0, 2.55, 2.80, 2.95, 3.45, 3.95, 4.45, 4.95, 5.45, 5.95, 7.45, 10.78};
 	double bValues[12][7]= {{ 0.00000000000,  0.0000000000,  00.00000000000,  000.00000000000,  0000.00000000000,  0000.00000000000,  00.00000000000},
 							{ 0.00000000000,  0.0000000000,  00.00000000000,  000.00000000000,  0000.00000000000,  0000.00000000000,  00.00000000000},
@@ -288,7 +288,7 @@ double MC::EAMRb_PairPot(double radius){
 	if (radius > 3.7){
 		phi  =  0.31906474916390e2           - 0.81743392122167e3/radius    + 0.11276093229851e5/tls.Pow(radius,2);
 		phi += -0.91581958116768e5/tls.Pow(radius,3) + 0.45029175720846e6/tls.Pow(radius,4) - 0.13200477580999e7/tls.Pow(radius,5);
-		phi +=  0.21301998697094e7/tls.Pow(radius,6) - 0.14604995446672e7/tls.Pow(radius,7) - 0.51504928921871*radius;
+		phi +=  0.21301998697094e7/tls.Pow(radius,6) - 0.14604995446672e7/tls.Pow(radius,7) - 0.51504928921871e0*radius;
 	}else phi = 0.132908 + 0.040299*(3.70-radius) + 0.15*(exp(1.96*(3.70-radius)) - 1);
 	return phi;
 }

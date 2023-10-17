@@ -111,7 +111,7 @@ void MC::ReadInputFile(string inFileName){
 			jthSpecies = tls.FindIndex(fluid, thermoSys.nSpecies, commands[2]);
 			sim.rdf[0] = ithSpecies;
 			sim.rdf[1] = jthSpecies;
-		}
+		}else if (commands[0] == "printtrajectory") sim.printTrajectory = true;
 		for (i=0; i<4; i++) commands[i] = "";
 	}
 	inFile.close();
