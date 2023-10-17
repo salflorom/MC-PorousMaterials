@@ -4,6 +4,7 @@
 #include <iostream> // cout
 #include <climits> // INT_MAX
 #include <cmath> // isnan
+#include <omp.h>
 
 #include "MC.h"
 #include "tools.h"
@@ -13,8 +14,10 @@ using namespace std;
 void MC::MinimizeEnergy(void){
 	int initMoves = 200;
 
+	#pragma omp parallel for
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		if (box[i].nParts > 0){
+			#pragma omp critical
 			cout << "Minimizing initial configuration of box \"" << box[i].name << "\"..."<< endl;
 			BoxEnergy(i);
 			cout << "\tEnergy/part. of box \"" << box[i].name << "\" before minimization: ";
@@ -27,7 +30,6 @@ void MC::MinimizeEnergy(void){
 			cout << "\tEnergy/part. of box \"" << box[i].name << "\" after minimization (";
 			cout << box[i].nParts*initMoves << " moves): ";
 			cout << box[i].energy/box[i].nParts << " K" << endl;
-			cout << endl;
 		}
 	}
 }
@@ -75,11 +77,23 @@ void MC::EnergyOfParticle(int ithBox, int ithSpecies, int index){
 	//Fluid-Fluid energy
 	for (int jthSpecies=0; jthSpecies<thermoSys.nSpecies; jthSpecies++){
 		if (fluid[ithSpecies].vdwPot[jthSpecies] == "lj"){ //Lennard-Jones potential.
-			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += LJ_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += LJ126_Pot(ithBox, ithSpecies, jthSpecies, index);
 		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "hs"){
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += HardSphere_Pot(ithBox, ithSpecies, jthSpecies, index);
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_na"){ //EAM potential for Na.
+			tmp = EAMNa_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_k"){ //EAM potential for K.
+			tmp = EAMK_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
+		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_rb"){ //EAM potential for Rb.
+			tmp = EAMRb_Pot(ithBox, ithSpecies, jthSpecies, index);
+			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
+			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
 		}else if (fluid[ithSpecies].vdwPot[jthSpecies] == "eam_ga"){ //EAM potential for Ga.
-			tmp = EAMGA_Pot(ithBox, ithSpecies, jthSpecies, index);
+			tmp = EAMGa_Pot(ithBox, ithSpecies, jthSpecies, index);
 			box[ithBox].fluid[ithSpecies].particle[index].manyBodyE += tmp[0];
 			box[ithBox].fluid[ithSpecies].particle[index].pairPotE += tmp[1];
 		}

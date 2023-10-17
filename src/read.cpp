@@ -50,7 +50,7 @@ void MC::ReadInputFile(string inFileName){
 		if (commands[0] == "projectname") sim.projName = commands[1];
 		else if (commands[0] == "productionsets") sim.nSets = stod(commands[1]);
 		else if (commands[0] == "equilibriumsets") sim.nEquilSets = stod(commands[1]);
-		else if (commands[0] == "cyclesperset") sim.nCyclesPerSet = stod(commands[1]);
+		else if (commands[0] == "stepsperset") sim.nStepsPerSet = stod(commands[1]);
 		else if (commands[0] == "printeverynsets") sim.printEvery = stod(commands[1]);
 		else if (commands[0] == "ndisplacementattempts") sim.nDispAttempts = stoi(commands[1]);
 		else if (commands[0] == "nvolumeattempts") sim.nVolAttempts = stoi(commands[1]);
@@ -111,7 +111,7 @@ void MC::ReadInputFile(string inFileName){
 			jthSpecies = tls.FindIndex(fluid, thermoSys.nSpecies, commands[2]);
 			sim.rdf[0] = ithSpecies;
 			sim.rdf[1] = jthSpecies;
-		}
+		}else if (commands[0] == "printtrajectory") sim.printTrajectory = true;
 		for (i=0; i<4; i++) commands[i] = "";
 	}
 	inFile.close();

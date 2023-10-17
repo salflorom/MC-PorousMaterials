@@ -19,7 +19,7 @@ void MC::PrintParams(void){
 	cout << "Simulation parameters:" << endl;
 	cout << "\tEquilibration sets: " << sim.nEquilSets << endl;
 	cout << "\tProduction sets: " << sim.nSets << endl;
-	cout << "\tCycles per set: " << sim.nCyclesPerSet << endl;
+	cout << "\tSteps per set: " << sim.nStepsPerSet << endl;
 	cout << "\tPrint every n sets: " << sim.printEvery << endl;
 	cout << "\tNum. of displacement attempts: " << sim.nDispAttempts << endl;
 	cout << "\tNum. of change volume attempts: " << sim.nVolAttempts << endl;
@@ -83,6 +83,8 @@ void MC::PrintParams(void){
 		jthSpecies = sim.rdf[1];
 		cout << "Sample RDF: " << fluid[ithSpecies].name << "-" << fluid[jthSpecies].name << endl;
 	}
+	if (sim.printTrajectory) cout << "Print Trajectory: Yes" << endl;
+	else cout << "Print Trajectory: No" << endl;
 	cout << endl;
 
 	for (i=0; i<thermoSys.nSpecies; i++){
@@ -137,7 +139,7 @@ void MC::PrintRDF(void){
 		rho = nParts/box[0].volume;
 		constant = (4*pi*rho/3);
 		for (int bin=1; bin<=NBINS; bin++){
-			gofr[bin] = stats.rdf[bin]/(1.*nParts*sim.nCyclesPerSet*sim.nSets);
+			gofr[bin] = stats.rdf[bin]/(1.*nParts*sim.nStepsPerSet*sim.nSets);
 			lowR = bin*deltaR;
 			highR = lowR + deltaR;
 			dn_ideal = constant*(tls.Pow(highR,3)-tls.Pow(lowR,3));
@@ -145,13 +147,15 @@ void MC::PrintRDF(void){
 		}
 		//Write into the file.
 		outDirName << "./" << sim.projName;
-		outFileName << outDirName.str() << box[0].name << "/rdf_";
+		outFileName << outDirName.str() << "/" << box[0].name << "/rdf_";
 		outFileName << fluid[ithSpecies].name << "-" << fluid[jthSpecies].name << ".dat";
 		rdfFile.open(outFileName.str());
 		rdfFile << "nBins: "<< NBINS << endl;
 		rdfFile << "r[AA]\tg(r)" << endl;
 		for (int bin=1; bin<=NBINS; bin++) rdfFile << (bin+0.5)*deltaR << "\t" << gofr[bin] << endl;
 		rdfFile.close();
+		outFileName.str(""); outFileName.clear();
+		rdfFile.clear();
 	}
 }
 void MC::PrintTrajectory(int set){
@@ -161,26 +165,28 @@ void MC::PrintTrajectory(int set){
 	ostringstream outDirName, outFileName;
 	double tmp=0.0;
 
-	outDirName << "./" << sim.projName;
-	for (int i=0; i<thermoSys.nBoxes; i++){
-		outFileName << outDirName.str() << "/" << box[i].name << "/trajectory.exyz";
-		if (set == 0) trajFile.open(outFileName.str());
-		else trajFile.open(outFileName.str(), ios::app);
-		trajFile << box[i].nParts << "\n";
-		trajFile << "Lattice=\" " << box[i].width[0] << " " << tmp << " " << tmp << " ";
-		trajFile << tmp << " " << box[i].width[1] << " " << tmp << " ";
-		trajFile << tmp << " " << tmp << " " << box[i].width[2] << "\" ";
-		trajFile << "Properties=species:S:1:pos:R:3 Time=" << 1.*set << "\n";
-		for (int j=0; j<thermoSys.nSpecies; j++){
-			for (int k=1; k<=box[i].fluid[j].nParts; k++){
-				part = box[i].fluid[j].particle[k];
-				trajFile << fluid[j].name << "\t";
-				trajFile << part.x << "\t" << part.y << "\t" << part.z << "\n"; //AA
+	if (sim.printTrajectory){
+		outDirName << "./" << sim.projName;
+		for (int i=0; i<thermoSys.nBoxes; i++){
+			outFileName << outDirName.str() << "/" << box[i].name << "/trajectory.exyz";
+			if (set == 0) trajFile.open(outFileName.str());
+			else trajFile.open(outFileName.str(), ios::app);
+			trajFile << box[i].nParts << "\n";
+			trajFile << "Lattice=\" " << box[i].width[0] << " " << tmp << " " << tmp << " ";
+			trajFile << tmp << " " << box[i].width[1] << " " << tmp << " ";
+			trajFile << tmp << " " << tmp << " " << box[i].width[2] << "\" ";
+			trajFile << "Properties=species:S:1:pos:R:3 Time=" << 1.*set << "\n";
+			for (int j=0; j<thermoSys.nSpecies; j++){
+				for (int k=1; k<=box[i].fluid[j].nParts; k++){
+					part = box[i].fluid[j].particle[k];
+					trajFile << fluid[j].name << "\t";
+					trajFile << part.x << "\t" << part.y << "\t" << part.z << "\n"; //AA
+				}
 			}
+			trajFile.close();
+			outFileName.str(""); outFileName.clear();
+			trajFile.clear();
 		}
-		trajFile.close();
-		outFileName.str(""); outFileName.clear();
-		trajFile.clear();
 	}
 }
 void MC::PrintLog(int set){
@@ -229,24 +235,24 @@ void MC::PrintStats(int set){
 	cout << setprecision(7);
 	if (set < sim.nEquilSets) cout << "Equilibrium set: " << set << endl;
 	else cout << "Set: " << set << endl;
-	if (sim.nVolAttempts > 0){
-		cout << "AcceptVolRatio; RejectVolRatio:\t";
-		cout << stats.acceptanceVol*1./stats.nVolChanges << "; ";
-		cout << stats.rejectionVol*1./stats.nVolChanges << endl;
-		if (set < sim.nEquilSets) cout << "Volume step size: " << sim.dv << endl;
-	}
-	if (sim.nSwapAttempts > 0){
-		cout << "AcceptSwapRatio; RejectSwapRatio:\t";
-		cout << stats.acceptSwap*1./stats.nSwaps << "; ";
-		cout << stats.rejectSwap*1./stats.nSwaps << endl;
-	}
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		cout << "Box " << box[i].name << ":" << endl;
+		if (sim.nVolAttempts > 0){
+			cout << "\tAcceptVolRatio; RejectVolRatio:\t";
+			cout << stats.acceptanceVol[i]*1./stats.nVolChanges << "; ";
+			cout << stats.rejectionVol[i]*1./stats.nVolChanges << endl;
+			if (set < sim.nEquilSets) cout << "\tVolume step size: " << sim.dv[i] << endl;
+		}
+		if (sim.nSwapAttempts > 0){
+			cout << "\tAcceptSwapRatio; RejectSwapRatio:\t";
+			cout << stats.acceptSwap*1./stats.nSwaps << "; ";
+			cout << stats.rejectSwap*1./stats.nSwaps << endl;
+		}
 		if (stats.nDisplacements[i] > 0){
 			cout << "\tAcceptDispRatio; RegectDispRatio:\t";
 			cout << stats.acceptance[i]*1./stats.nDisplacements[i] << "; ";
 			cout << stats.rejection[i]*1./stats.nDisplacements[i] << endl;
-			if (set < sim.nEquilSets) cout << "\tStep size: " << sim.dr[i] << endl;
+			if (set < sim.nEquilSets) cout << "\tDisplacement step size: " << sim.dr[i] << endl;
 		}
 		cout << "\tNumParticles; BoxSize; Energy/Particle:\t";
 		cout << box[i].nParts << "; ";
