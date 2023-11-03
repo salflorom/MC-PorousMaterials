@@ -5,7 +5,7 @@
 *.out
 *.csv
 output_*
-mcexecutable
+simulate
 
 stats/
 Plots/

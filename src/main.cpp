@@ -9,7 +9,6 @@
 #include <iostream> // cout
 #include <chrono> // chrono
 #include <ctime> // time_t, ctime
-#include <omp.h> // pragma, omp_get_num_threads
 
 #include "MC.h"
 
@@ -24,11 +23,6 @@ int main(int argc, char** argv){
 	chrono::time_point<chrono::system_clock> start, startSimulation, endSimulation;
 	chrono::duration<double> elapsedMinimization, elapsedSimulation;
 	MC mc;
-
-	#pragma omp parallel
-	{numThreads = omp_get_num_threads();}
-	cout << "Number of assigned OMP threads: " << numThreads << endl;
-	cout << endl;
 
 	start = chrono::system_clock::now();
 	time_t startTime = chrono::system_clock::to_time_t(start);
@@ -61,11 +55,9 @@ int main(int argc, char** argv){
 	mc.PrintLog(0);
 
 	startSimulation = chrono::system_clock::now();
-	#pragma omp parallel for
 	for (int set=1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
-		#pragma omp critical
 		{for (int step=1; step<=nStepsPerSet; step++){
 			rand = mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts);
 			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.

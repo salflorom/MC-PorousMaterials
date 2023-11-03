@@ -2,7 +2,7 @@
 
 #include <cstring> // strlen
 #include <iostream> // cout
-#include <cmath> // exp, pi, round, log
+#include <cmath> // exp, pi, log
 
 #include "MC.h"
 #include "tools.h"
@@ -197,7 +197,7 @@ void MC::ChangeVolume(void){
 	if (extPress > 0){ // NPT or Gibbs-NPT ensemble.
 		// Record current config.
 		do{
-			ithBox = round(Random()*thermoSys.nBoxes);
+			ithBox = int(Random()*thermoSys.nBoxes);
 		}while (box[ithBox].fix);
 		oldBox0 = box[ithBox]; // Record old information.
 		olddv[ithBox] = sim.dv[ithBox];
