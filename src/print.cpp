@@ -175,7 +175,7 @@ void MC::PrintTrajectory(int set){
 			trajFile << "Lattice=\" " << box[i].width[0] << " " << tmp << " " << tmp << " ";
 			trajFile << tmp << " " << box[i].width[1] << " " << tmp << " ";
 			trajFile << tmp << " " << tmp << " " << box[i].width[2] << "\" ";
-			trajFile << "Properties=species:S:1:pos:R:3 Time=" << 1.*set << "\n";
+			trajFile << "Properties=species:S:1:pos:R:3 Set=" << 1.*set << "\n";
 			for (int j=0; j<thermoSys.nSpecies; j++){
 				for (int k=1; k<=box[i].fluid[j].nParts; k++){
 					part = box[i].fluid[j].particle[k];
