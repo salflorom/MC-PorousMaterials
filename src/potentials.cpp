@@ -402,6 +402,7 @@ double MC::SlitLJ_Pot(int ithBox, int ithSpecies, int index){
 // Tjatjopoulos et al., 1988.
 // Molecule-Micropore Interaction Potentials.
 // J. Phys. Chem., 92(13), pp.4006-4007.
+// Potential extended by Santiago for multiple layers.
 // Source for hypergeometric function:
 // Press, W.H., 2007.
 // Numerical recipes 3rd edition: The art of scientific computing.
@@ -409,11 +410,14 @@ double MC::SlitLJ_Pot(int ithBox, int ithSpecies, int index){
 double MC::CylindricalLJ_Pot(int ithBox, int ithSpecies, int index){
 	Tools tls;
 	double yPos, zPos;
-	double x, u1, u2, usf, rho;
+	double x, usf, rho;
+	int nLayers = box[ithBox].nLayersPerWall;
+	double delta = box[ithBox].deltaLayers; // AA
 	double sizeR = box[ithBox].width[2]*0.5; // AA
 	double dens = box[ithBox].solidDens; // AA^-2
 	double eps = box[ithBox].fluid[ithSpecies].epsilon[0]; // K
 	double sig = box[ithBox].fluid[ithSpecies].sigma[0]; // AA
+	double u1=0, u2=0;
 
 	yPos = box[ithBox].fluid[ithSpecies].particle[index].y - 0.5*box[ithBox].width[1];
 	zPos = box[ithBox].fluid[ithSpecies].particle[index].z - 0.5*box[ithBox].width[2];
@@ -421,10 +425,13 @@ double MC::CylindricalLJ_Pot(int ithBox, int ithSpecies, int index){
 	// Reducing units/
 	dens *= sig*sig;
 	sizeR /= sig;
+	delta /= sig;
 	rho /= sig;
 	x = sizeR-rho;
-	u1 = 63. /32. * 1./(tls.Pow(x,10)*tls.Pow(2.0-x/sizeR,10)) * hypgeo(-4.5,-4.5,1.,tls.Pow(1-x/sizeR,2));
-	u2 = 3. / (tls.Pow(x,4)*tls.Pow(2.0-x/sizeR,4)) * hypgeo(-1.5,-1.5,1.,tls.Pow(1.0-x/sizeR,2));
+	for (int i=0; i<nLayers; i++){
+		u1 += 63. /32. * 1./(tls.Pow(x,10)*tls.Pow(2.0-x/(sizeR+i*delta),10)) * hypgeo(-4.5,-4.5,1.,tls.Pow(1-x/(sizeR+i*delta),2));
+		u2 += 3. / (tls.Pow(x,4)*tls.Pow(2.0-x/(sizeR+i*delta),4)) * hypgeo(-1.5,-1.5,1.,tls.Pow(1.0-x/(sizeR+i*delta),2));
+	}
 	usf = (u1-u2)*pi*pi*dens*eps; // K
 	return usf;
 }
