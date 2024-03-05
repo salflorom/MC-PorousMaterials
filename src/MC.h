@@ -146,7 +146,8 @@ class MC {
 
 		// Solid-Fluid potentials //
 		double SlitLJ_Pot(int, int, int);
-		double CylindricalLJ_Pot(int, int, int);
+		double CylindricalLJ10_4(int, int, int);
+		double CylindricalSteele10_4_3(int, int, int);
 		double SphericalLJ_Pot(int, int, int);
 		// Solid-Fluid potentials //
 /* **************************************************************************** */

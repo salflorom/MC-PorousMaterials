@@ -407,7 +407,7 @@ double MC::SlitLJ_Pot(int ithBox, int ithSpecies, int index){
 // Press, W.H., 2007.
 // Numerical recipes 3rd edition: The art of scientific computing.
 // Cambridge university press.
-double MC::CylindricalLJ_Pot(int ithBox, int ithSpecies, int index){
+double MC::CylindricalLJ10_4(int ithBox, int ithSpecies, int index){
 	Tools tls;
 	double yPos, zPos;
 	double x, usf, rho;
@@ -433,6 +433,36 @@ double MC::CylindricalLJ_Pot(int ithBox, int ithSpecies, int index){
 		u2 += 3. / (tls.Pow(x,4)*tls.Pow(2.0-x/(sizeR+i*delta),4)) * hypgeo(-1.5,-1.5,1.,tls.Pow(1.0-x/(sizeR+i*delta),2));
 	}
 	usf = (u1-u2)*pi*pi*dens*eps; // K
+	return usf;
+}
+// Paper:
+// Siderius, D. W.; Gelb, L. D.
+// Extension of the Steele 10-4-3 Potential for Adsorption Calculations in Cylindrical, Spherical, and Other Pore Geometries.
+// J. Chem. Phys. 2011, 135 (8), 084703.
+// https://doi.org/10.1063/1.3626804.
+double MC::CylindricalSteele10_4_3(int ithBox, int ithSpecies, int index){
+	Tools tls;
+	double yPos, zPos;
+	double x, usf, rho, psi6, psi3, phi3;
+	double delta = box[ithBox].deltaLayers; // AA
+	double sizeR = box[ithBox].width[2]*0.5; // AA
+	double dens = box[ithBox].solidDens; // AA^-2
+	double eps = box[ithBox].fluid[ithSpecies].epsilon[0]; // K
+	double sig = box[ithBox].fluid[ithSpecies].sigma[0]; // AA
+	double alpha = 0.61;
+
+	yPos = box[ithBox].fluid[ithSpecies].particle[index].y - 0.5*box[ithBox].width[1];
+	zPos = box[ithBox].fluid[ithSpecies].particle[index].z - 0.5*box[ithBox].width[2];
+	rho = sqrt(tls.Pow(yPos,2) + tls.Pow(zPos,2));
+
+	psi6 = 4*sqrt(pi)*tgammal(5.5)/tgammal(6)*tls.Pow(sig/sizeR,10)/tls.Pow(1-tls.Pow(rho/sizeR,2),10);
+	psi6 *= hypgeo(-4.5,-4.5,1.,tls.Pow(rho/sizeR,2));
+	psi3 = 4*sqrt(pi)*tgammal(2.5)/tgammal(3)*tls.Pow(sig/sizeR,4)/tls.Pow(1-tls.Pow(rho/sizeR,2),4);
+	psi3 *= hypgeo(-1.5,-1.5,1.,tls.Pow(rho/sizeR,2));
+	phi3 = 4*sqrt(pi)/3*tgammal(2.5)/tgammal(3)*tls.Pow(sig/(sizeR+alpha*delta),3)/tls.Pow(1-tls.Pow(rho/(sizeR+alpha*delta),2),3);
+	phi3 *= hypgeo(-1.5,-0.5,1.,tls.Pow(rho/(sizeR+alpha*delta),2));
+
+	usf = 2*pi*dens*delta*sig*sig*eps*(psi6-psi3-sig/delta*phi3); // K
 	return usf;
 }
 // Paper:
