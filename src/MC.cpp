@@ -27,7 +27,7 @@ MC::MC(void){
 	}
 	for (i=0; i<=NBINS; i++) stats.rdf[i] = 0.;
 	sim.projName = "";
-	sim.printTrajectory = false;
+	sim.printTrajectory = sim.restart = false;
 	sim.rdf[0] = sim.rdf[1] = -1;
 	for (i=0; i<MAXBOX; i++){
 		sim.dr[i] = 1;

@@ -3,9 +3,10 @@
 #include <cmath> // cbrt, sqrt
 #include <string> // string
 #include <cstring> // strlen
-#include <iostream> // cout
+#include <iostream> // cout, stod
 #include <fstream> // ifstream
-#include <cstdlib> //stod, stoi
+#include <cstdlib> // stod, stoi, strtol
+#include <regex> // regex
 
 #include "MC.h"
 #include "tools.h"
@@ -30,13 +31,14 @@ double MC::ComputeVolume(Box ithBox){
 	else if (geometry == "slit") return xLength*yLength*zLength;
 	else return tls.Pow(zLength,3); // Bulk phase.
 }
-void MC::ReadInputFile(string inFileName){
+long int MC::ReadInputFile(string inFileName){
 	int i, j, ithBox, ithSpecies, jthSpecies;
 	double maxRcut;
 	string* commands;
 	string line;
 	Tools tls;
 	ifstream inFile;
+	long int set = 0;
 
 	inFile.open(inFileName);
 	if (!inFile.is_open()){ //Check if file was opened successfully.
@@ -48,6 +50,7 @@ void MC::ReadInputFile(string inFileName){
 		for (i=0; i<4; i++) commands[i] = tls.LowerCase(commands[i]);
 		// Simulation parameters.
 		if (commands[0] == "projectname") sim.projName = commands[1];
+		else if (commands[0] == "restart") sim.restart = true;
 		else if (commands[0] == "productionsets") sim.nSets = stod(commands[1]);
 		else if (commands[0] == "equilibriumsets") sim.nEquilSets = stod(commands[1]);
 		else if (commands[0] == "stepsperset") sim.nStepsPerSet = stod(commands[1]);
@@ -161,5 +164,80 @@ void MC::ReadInputFile(string inFileName){
 	}
 	// Set step size.
 	for (i=0; i<thermoSys.nBoxes; i++) sim.dr[i] = 0.1*box[i].width[2]; //AA
+	// Set params according to read restart
+	if (sim.restart) set = Restart();
+	return set;
+}
+long int MC::Restart(void){
+	char ch;
+	int count;
+	bool keepLooking;
+	string lastLine, token;
+	ifstream simFile;
+	ostringstream inDirName, simFileName;
+	size_t pos=0;
+	int set=0;
+	string substrings[11];
+	string delimiter = "\t";
+
+	inDirName << "./" << sim.projName;
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		for (int j=0; j<thermoSys.nSpecies; j++){
+			simFileName << inDirName.str() << "/" << box[i].name << "/simulation_" << fluid[j].name << ".log";
+			simFile.open(simFileName.str());
+			if (simFile.is_open()){ //Check if file was opened successfully.
+				simFile.seekg(-2, ios_base::end); // go to one spot before the EOF
+				keepLooking = true;
+				while (keepLooking){
+					simFile.get(ch); // Get current byte's data
+					if ((int)simFile.tellg() <= 1){ // If the data was at or before the 0th byte
+						simFile.seekg(0); // The first line is the last line
+						keepLooking = false; // So stop there
+					}else if (ch == '\n'){keepLooking = false; // Stop at the current position if the data was a newline.
+					}else simFile.seekg(-2, ios_base::cur); // Move to the front of that data, then to the front of the data before it.
+				}
+				getline(simFile, lastLine); // Read the current line
+				count = 0;
+				while ((pos = lastLine.find(delimiter)) != string::npos){ // Split the line into an array of strings.
+					token = lastLine.substr(0, pos);
+					substrings[count] = token;
+					lastLine.erase(0, pos + delimiter.length());
+					count++;
+				}
+				if (substrings[0] == ""){
+					cout << "Error reading log file. File: " << simFileName.str() << endl;
+					exit(EXIT_FAILURE);
+				}
+				set = stol(substrings[0]);
+				thermoSys.temp = stod(substrings[1]);
+				box[i].width[2] = stod(substrings[2]);
+				box[i].fluid[j].nParts = stoi(substrings[7]);
+			}else{
+				cout << "Warning: Last configuration not found. Path: " << simFileName.str() << endl;
+				cout << "\tCurrent set, temperature, box width, and num. of particles will be set according to the input file." << endl << endl;
+			}
+			simFileName.str(string());
+			simFileName.clear();
+			simFile.close();
+			simFile.clear();
+		}
+		box[i].nParts = 0;
+		for (int j=0; j<thermoSys.nSpecies; j++) box[i].nParts += box[i].fluid[j].nParts;
+	}
+	thermoSys.nParts = 0;
+	for (int i=0; i<thermoSys.nBoxes; i++) thermoSys.nParts += box[i].nParts;
+	cout << "Restart simulation: Yes" << endl;
+	cout << "Current system state: " << endl;
+	cout << "\tCurrent set: " << set << endl;
+	cout << "\tSystem temperature: " << thermoSys.temp << endl;
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		cout << "\tBox " << box[i].name << " size: " << box[i].width[2] << endl;
+		for (int j=0; j<thermoSys.nSpecies ; j++){
+			cout << "\t\tNum. of particles for species " << fluid[j].name << " in the box: " << box[i].fluid[j].nParts << endl;
+		}
+		cout << "\tNum. of particles in the box: " << box[i].nParts << endl;
+	}
+	cout << endl;
+	return set;
 }
 

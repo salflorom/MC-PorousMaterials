@@ -39,7 +39,7 @@ class MC {
 			double binWidth, barC[MAXBOX][MAXSPECIES], widomInsert[MAXBOX][MAXSPECIES], widomDelete[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
-			bool printTrajectory;
+			bool printTrajectory, restart;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
 			double dr[MAXBOX], dv[MAXBOX];
 			int nDispAttempts, nSwapAttempts, nVolAttempts;
@@ -83,7 +83,7 @@ class MC {
 /* **************************************************************************** */
 		MC(void);
 		void OutputDirectory(void);
-		void ReadInputFile(string);
+		long int ReadInputFile(string);
 		void ResetStats(void);
 		void PrintParams(void);
 		void InsertParticle(int, int, int);
@@ -104,53 +104,56 @@ class MC {
 		void ComputeWidom(void);
 		void ComputeChemicalPotential(void);
 		void EnergyOfParticle(int, int, int);
-		double Random(void){return dis(engine);} //random num. in the interval [0,1).
-		double BarWeight(double, double);
-		double ComputeVolume(Box);
-		double ComputeBoxWidth(Box, double);
 		void BoxEnergy(int);
 		void CorrectEnergy(void);
 
+		long int Restart(void);
 		int* GetMCMoves(void);
 		int GetNSets(void){return int(sim.nSets);}
 		int GetNEquilSets(void){return int(sim.nEquilSets);}
 		int GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
 		int GetPrintEvery(void){return int(sim.printEvery);}
 
+		double Random(void){return dis(engine);} //random num. in the interval [0,1).
+		double BarWeight(double, double);	
+    double ComputeVolume(Box);
+		double ComputeBoxWidth(Box, double);
+
 		double NeighDistance(int, Particle, Particle);
-		double StepUnit(double, double, double);
-		// Fluid-Fluid potentials //
+		// >>> Fluid-Fluid potentials >>> //
+		// Hard sphere potential
 		double HardSphere_Pot(int, int, int, int);
-		// Lennard-Jones 12-6 potential //
+		// Lennard-Jones 12-6 potential
 		double LJ126_Pot(int, int, int, int);
-		// EAM Na potential //
+		// EAM Na potential
 		double* EAMNa_Pot(int, int, int, int);
 		double EAMNa_EmbPot(double);
 		double EAMNa_eDens(double);
 		double EAMNa_PairPot(double);
-		// EAM K potential //
+		// EAM K potential
 		double* EAMK_Pot(int, int, int, int);
 		double EAMK_EmbPot(double);
 		double EAMK_eDens(double);
 		double EAMK_PairPot(double);
-		// EAM Rb potential //
+		// EAM Rb potential
 		double* EAMRb_Pot(int, int, int, int);
 		double EAMRb_EmbPot(double);
 		double EAMRb_eDens(double);
 		double EAMRb_PairPot(double);
-		// EAM Ga potential //
+		// EAM Ga potential
 		double* EAMGa_Pot(int, int, int, int);
+		double StepUnit(double, double, double);
 		double EAMGa_EmbPot(double);
 		double EAMGa_eDens(double);
 		double EAMGa_PairPot(double);
-		// Fluid-Fluid potentials //
+		// <<< Fluid-Fluid potentials <<< //
 
-		// Solid-Fluid potentials //
+		// >>> Solid-Fluid potentials >>> //
 		double SlitLJ_Pot(int, int, int);
 		double CylindricalLJ10_4(int, int, int);
 		double CylindricalSteele10_4_3(int, int, int);
 		double SphericalLJ_Pot(int, int, int);
-		// Solid-Fluid potentials //
+		// <<< Solid-Fluid potentials >>> //
 /* **************************************************************************** */
 };
 /* **************************************************************************** */

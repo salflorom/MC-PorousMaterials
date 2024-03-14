@@ -16,8 +16,8 @@ int main(int argc, char** argv){
 	string inFileName;
 	int nSets, nEquilSets, nStepsPerSet, printEvery;
 	int nDispAttempts, nVolAttempts, nSwapAttempts;
-	int numThreads;
 	int* moves;
+	long int currentSet;
 	double rand;
 	chrono::time_point<chrono::system_clock> startMinimization, endMinimization;
 	chrono::time_point<chrono::system_clock> start, startSimulation, endSimulation;
@@ -29,7 +29,7 @@ int main(int argc, char** argv){
 	cout << "Starting simulation at " << ctime(&startTime) << endl;
 
 	inFileName = argv[1];
-	mc.ReadInputFile(inFileName);
+	currentSet = mc.ReadInputFile(inFileName);
 	mc.PrintParams();
 	mc.OutputDirectory();
 	mc.InitialConfig();
@@ -41,7 +41,7 @@ int main(int argc, char** argv){
 	nDispAttempts = moves[0];
 	nVolAttempts = moves[1];
 	nSwapAttempts = moves[2];
-	mc.PrintTrajectory(0);
+	if (currentSet == 0) mc.PrintTrajectory(0);
 
 	startMinimization = chrono::system_clock::now();
 	mc.MinimizeEnergy();
@@ -51,14 +51,16 @@ int main(int argc, char** argv){
 	cout << "Elapsed time of minimization: " << elapsedMinimization.count() << " s" << endl;
 	cout << endl;
 
-	mc.PrintTrajectory(1);
-	mc.PrintLog(0);
+	if (currentSet == 0){
+		mc.PrintTrajectory(0);
+		mc.PrintLog(0);
+	}
 
 	startSimulation = chrono::system_clock::now();
-	for (int set=1; set<=nSets; set++){
+	for (int set=currentSet+1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
-		{for (int step=1; step<=nStepsPerSet; step++){
+		for (int step=1; step<=nStepsPerSet; step++){
 			rand = mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts);
 			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.
 			else if (rand <= nDispAttempts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
@@ -69,14 +71,13 @@ int main(int argc, char** argv){
 				mc.ComputeRDF();
 			}
 		}
-		if (set%printEvery == 0) mc.PrintStats(set);
-		if ((set%printEvery == 0) && (set > nEquilSets)){
+		if (set%printEvery == 0){
 			mc.ComputeChemicalPotential();
+			mc.PrintStats(set);
 			mc.PrintTrajectory(set);
 			mc.PrintLog(set);
 		}
 		mc.AdjustMCMoves(set);
-		}
 	}
 	endSimulation = chrono::system_clock::now();
 	elapsedSimulation = endSimulation-startSimulation;
