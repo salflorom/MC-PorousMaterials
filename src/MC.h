@@ -35,8 +35,8 @@ class MC {
 			int acceptance[MAXBOX], rejection[MAXBOX], nDisplacements[MAXBOX];
 			int acceptanceVol[MAXBOX], rejectionVol[MAXBOX], nVolChanges;
 			int acceptSwap, rejectSwap, nSwaps;
-			int widomInsertions[MAXBOX];
-			double binWidth, widom[MAXBOX][MAXSPECIES], rdf[NBINS+1];
+			int widomInsertions[MAXBOX][MAXSPECIES], widomDeletions[MAXBOX][MAXSPECIES];
+			double binWidth, barC[MAXBOX][MAXSPECIES], widomInsert[MAXBOX][MAXSPECIES], widomDelete[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
 			bool printTrajectory;
@@ -105,6 +105,7 @@ class MC {
 		void ComputeChemicalPotential(void);
 		void EnergyOfParticle(int, int, int);
 		double Random(void){return dis(engine);} //random num. in the interval [0,1).
+		double BarWeight(double, double);
 		double ComputeVolume(Box);
 		double ComputeBoxWidth(Box, double);
 		void BoxEnergy(int);

@@ -361,11 +361,13 @@ void MC::SwapParticle(void){
 			InsertParticle(inBox, ithSpecies, inIndex);
 			EnergyOfParticle(inBox, ithSpecies, inIndex);
 			inEnergy = box[inBox].fluid[ithSpecies].particle[inIndex].energy; // K
-			stats.widom[inBox][ithSpecies] += box[inBox].volume*exp(-inEnergy/thermoSys.temp)/(box[inBox].nParts+1); // Compute mu through Widom.
-			stats.widomInsertions[inBox]++;
+			stats.widomInsert[inBox][ithSpecies] += BarWeight(stats.barC[inBox][ithSpecies],inEnergy)*box[inBox].volume*exp(-0.5*inEnergy/thermoSys.temp)/(box[inBox].fluid[ithSpecies].nParts+1); // Compute mu through Widom.
+			stats.widomInsertions[inBox][ithSpecies]++;
 			outIndex = int(Random()*box[outBox].fluid[ithSpecies].nParts + 1);
 			EnergyOfParticle(outBox, ithSpecies, outIndex); //K
 			outEnergy = box[outBox].fluid[ithSpecies].particle[outIndex].energy; // K
+			stats.widomDelete[outBox][ithSpecies] += BarWeight(stats.barC[outBox][ithSpecies],outEnergy)*box[outBox].volume*exp(0.5*outEnergy/thermoSys.temp)/(box[outBox].fluid[ithSpecies].nParts+1); // Compute mu through Widom.
+			stats.widomDeletions[outBox][ithSpecies]++;
 			deltaE = inEnergy-outEnergy;
 			arg = deltaE+log(box[outBox].volume*(box[inBox].nParts+1)/(box[inBox].volume*box[outBox].nParts))*temp; // Acceptance criterion (for removing particle).
 			if (Random() < exp(-arg/temp)){
@@ -393,62 +395,69 @@ void MC::SwapParticle(void){
 		}
 	}
 }
-// Performs Widom insertions to compute mu in each box.
-// Note: It only works for simple fluids.
+// Performs Widom insertions to compute mu in each box using Bennett's acceptance ratio method (BAR).
+// Daly, K. B.; Benziger, J. B.; Debenedetti, P. G.; Panagiotopoulos, A. Z.
+// Massively Parallel Chemical Potential Calculation on Graphics Processing Units.
+// Comput. Phys. Commun. 2012, 183 (10), 2054–2062.
+// https://doi.org/10.1016/j.cpc.2012.05.006.
+// Note 1: It only works for monoatomic fluids.
 // Note 2: The Widom parameter is computed randomly in any box unless the chosen box is emtpy.
+double MC::BarWeight(double barC, double energy){return 1./cosh(0.5*(energy-barC)/thermoSys.temp);};
 void MC::ComputeWidom(void){
 	Tools tls;
-	int ithSpecies;
+	int ithSpecies, ithPart;
+	double density;
 	double energy=0.;
 
-	if (thermoSys.nBoxes == 1 && sim.nSwapAttempts == 0){
-		ithSpecies = int(Random()*thermoSys.nSpecies);
-		InsertParticle(0, ithSpecies, MAXPART-1); // Insert virtual particle.
-		stats.widomInsertions[0]++;
-		EnergyOfParticle(0, ithSpecies, MAXPART-1);
-		energy = box[0].fluid[ithSpecies].particle[MAXPART-1].energy;
-		if (sim.nVolAttempts > 0){
-			stats.widom[0][ithSpecies] += box[0].volume*exp(-energy/thermoSys.temp)/(box[0].fluid[ithSpecies].nParts+1);
-		}else stats.widom[0][ithSpecies] += exp(-energy/thermoSys.temp);
-		stats.widom[0][ithSpecies] += exp(-energy/thermoSys.temp);
+	if (thermoSys.nBoxes == 1 && sim.nSwapAttempts == 0){ // For single box simulations and no GCMC.
+		if (Random() < 0.5){ // Insert ghost particle (Widom insertion).
+			stats.widomInsertions[0][ithSpecies]++;
+			ithPart = MAXPART-1;
+			InsertParticle(0, ithSpecies, ithPart); // Insert virtual particle.
+			EnergyOfParticle(0, ithSpecies, ithPart);
+			energy = box[0].fluid[ithSpecies].particle[ithPart].energy;
+			if (sim.nVolAttempts > 0){ // If NPT ensemble, consider volume fluctuations.
+				stats.widomInsert[0][ithSpecies] += BarWeight(stats.barC[0][ithSpecies],energy)*box[0].volume*exp(-0.5*energy/thermoSys.temp)/(box[0].fluid[ithSpecies].nParts+1);
+			}else stats.widomInsert[0][ithSpecies] += BarWeight(stats.barC[0][ithSpecies],energy)*exp(-0.5*energy/thermoSys.temp); // NVT ensemble.
+		}else{ // Virtually delete real particle (Widom deletion).
+			stats.widomDeletions[0][ithSpecies]++;
+			ithSpecies = int(Random()*thermoSys.nSpecies);
+			ithPart = int(Random()*box[0].fluid[ithSpecies].nParts); // Select particle randomly.
+			EnergyOfParticle(0, ithSpecies, ithPart);
+			energy = box[0].fluid[ithSpecies].particle[ithPart].energy;
+			if (sim.nVolAttempts > 0){ // If NPT ensemble, consider volume fluctuations.
+				if (exp(0.5*energy/thermoSys.temp) < 1){
+					stats.widomDelete[0][ithSpecies] += BarWeight(stats.barC[0][ithSpecies],energy)*box[0].volume*exp(0.5*energy/thermoSys.temp)/(box[0].fluid[ithSpecies].nParts+1);
+				}else{ // Setting a boundary for deletion statistics (not included in the BAR method).
+					stats.widomDelete[0][ithSpecies] += BarWeight(stats.barC[0][ithSpecies],energy)*box[0].volume*exp(-0.5*energy/thermoSys.temp)/(box[0].fluid[ithSpecies].nParts+1);
+				}
+			}else{ // NVT ensemble.
+				if (exp(0.5*energy/thermoSys.temp) < 1){
+					stats.widomDelete[0][ithSpecies] += BarWeight(stats.barC[0][ithSpecies],energy)*exp(0.5*energy/thermoSys.temp);
+				}else{ // Setting a boundary for deletion statistics (not included in the BAR method).
+					stats.widomDelete[0][ithSpecies] += BarWeight(stats.barC[0][ithSpecies],energy)*exp(-0.5*energy/thermoSys.temp);
+				}
+			}
+		}
 	}
 }
-// Computes mu in each box from the Widom insearsions performed in the ComputeWidom method.
-// Note: It only works for simple fluids.
+// Computes mu in each box from the Widom insearsions performed in the ComputeWidom method (BAR algorithm).
+// Note: It only works for monoatomic fluids.
 // Note 2: the chemical potential is printed in all boxes.
 void MC::ComputeChemicalPotential(void){
 	Tools tls;
-	double thermalWL, particleMass, volume, muIdeal, muExcess, insertionParam;
+	double thermalWL, particleMass, muIdeal, muExcess, widomParam;
 	double extPress;
 
-	if (thermoSys.nBoxes == 1 && sim.nSwapAttempts == 0){
-		for (int i=0; i<thermoSys.nSpecies; i++){
-			particleMass = fluid[i].molarMass/na*1e-3; // kg/particle
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		for (int j=0; j<thermoSys.nSpecies; j++){
+			particleMass = fluid[j].molarMass/na*1e-3; // kg/particle
 			thermalWL = planck/sqrt(2.0*pi*particleMass*kb*thermoSys.temp)*1e10; //AA
-			volume = box[0].volume; //AA^3
-			insertionParam = stats.widom[0][i]/stats.widomInsertions[0];
-			if (sim.nVolAttempts > 0){
-				extPress = thermoSys.press/kb*1e-30; // K/AA^3
-				muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)*extPress/thermoSys.temp); //K
-				muExcess = -thermoSys.temp*log(insertionParam*extPress/thermoSys.temp); //K
-			}else{
-				muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)*(box[0].fluid[0].nParts+1)/volume); //K
-				muExcess = -thermoSys.temp*log(insertionParam); //K
-			}
-			box[0].fluid[i].muEx = muExcess; //K
-			box[0].fluid[i].mu = muIdeal+muExcess; //K
-		}
-	}else if (thermoSys.nBoxes > 1){
-		for (int i=0; i<thermoSys.nBoxes; i++){
-			for (int j=0; j<thermoSys.nSpecies; j++){
-				particleMass = fluid[j].molarMass/na*1e-3; // kg/particle
-				thermalWL = planck/sqrt(2.0*pi*particleMass*kb*thermoSys.temp)*1e10; //AA
-				muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)); //K
-				insertionParam = stats.widom[i][j]/stats.widomInsertions[i];
-				muExcess = -thermoSys.temp*log(insertionParam); //K
-				box[i].fluid[j].muEx = muExcess; //K
-				box[i].fluid[j].mu = muIdeal+muExcess; //K
-			}
+			widomParam = (stats.widomInsert[i][j]/stats.widomInsertions[i][j])/(stats.widomDelete[i][j]/stats.widomDeletions[i][j]);  // BAR method.
+			muIdeal = thermoSys.temp*log(tls.Pow(thermalWL,3)*(box[i].fluid[j].nParts+1)/box[i].volume); //K
+			muExcess = -thermoSys.temp*log(widomParam); //K
+			box[i].fluid[j].muEx = muExcess; //K
+			box[i].fluid[j].mu = muIdeal+muExcess; //K
 		}
 	}
 }
