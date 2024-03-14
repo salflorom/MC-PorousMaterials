@@ -35,8 +35,8 @@ class MC {
 			int acceptance[MAXBOX], rejection[MAXBOX], nDisplacements[MAXBOX];
 			int acceptanceVol[MAXBOX], rejectionVol[MAXBOX], nVolChanges;
 			int acceptSwap, rejectSwap, nSwaps;
-			int widomInsertions[MAXBOX];
-			double binWidth, widom[MAXBOX][MAXSPECIES], rdf[NBINS+1];
+			int widomInsertions[MAXBOX][MAXSPECIES], widomDeletions[MAXBOX][MAXSPECIES];
+			double binWidth, barC[MAXBOX][MAXSPECIES], widomInsert[MAXBOX][MAXSPECIES], widomDelete[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
 			bool printTrajectory, restart;
@@ -115,7 +115,8 @@ class MC {
 		int GetPrintEvery(void){return int(sim.printEvery);}
 
 		double Random(void){return dis(engine);} //random num. in the interval [0,1).
-		double ComputeVolume(Box);
+		double BarWeight(double, double);	
+    double ComputeVolume(Box);
 		double ComputeBoxWidth(Box, double);
 
 		double NeighDistance(int, Particle, Particle);
@@ -149,7 +150,8 @@ class MC {
 
 		// >>> Solid-Fluid potentials >>> //
 		double SlitLJ_Pot(int, int, int);
-		double CylindricalLJ_Pot(int, int, int);
+		double CylindricalLJ10_4(int, int, int);
+		double CylindricalSteele10_4_3(int, int, int);
 		double SphericalLJ_Pot(int, int, int);
 		// <<< Solid-Fluid potentials >>> //
 /* **************************************************************************** */

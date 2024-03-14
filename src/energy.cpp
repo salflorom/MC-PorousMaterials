@@ -66,8 +66,10 @@ void MC::EnergyOfParticle(int ithBox, int ithSpecies, int index){
 	//Particle-box energy
 	if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "lj" && box[ithBox].geometry == "sphere"){
 		box[ithBox].fluid[ithSpecies].particle[index].boxE += SphericalLJ_Pot(ithBox, ithSpecies, index);
-	}else if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "lj" && box[ithBox].geometry == "cylinder"){
-		box[ithBox].fluid[ithSpecies].particle[index].boxE += CylindricalLJ_Pot(ithBox, ithSpecies, index);
+	}else if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "lj10-4" && box[ithBox].geometry == "cylinder"){
+		box[ithBox].fluid[ithSpecies].particle[index].boxE += CylindricalLJ10_4(ithBox, ithSpecies, index);
+	}else if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "steele10-4-3" && box[ithBox].geometry == "cylinder"){
+		box[ithBox].fluid[ithSpecies].particle[index].boxE += CylindricalSteele10_4_3(ithBox, ithSpecies, index);
 	}else if (box[ithBox].fluid[ithSpecies].vdwPot[0] == "lj" && box[ithBox].geometry == "slit"){
 		box[ithBox].fluid[ithSpecies].particle[index].boxE += SlitLJ_Pot(ithBox, ithSpecies, index);
 	}
