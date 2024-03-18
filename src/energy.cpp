@@ -10,23 +10,25 @@
 
 using namespace std;
 
-void MC::MinimizeEnergy(void){
+void MC::MinimizeEnergy(long int set){
 	int initMoves = 200;
 
 	for (int i=0; i<thermoSys.nBoxes; i++){
 		if (box[i].nParts > 0){
-			cout << "Minimizing initial configuration of box \"" << box[i].name << "\"..."<< endl;
-			BoxEnergy(i);
-			cout << "\tEnergy/part. of box \"" << box[i].name << "\" before minimization: ";
-			cout << box[i].energy/box[i].nParts << " K" << endl;
-			for (int j=0; j<initMoves; j++){
-				for (int l=0; l<box[i].nParts; l++) MoveParticle();
-				//AdjustMCMoves();
-			}
-			BoxEnergy(i);
-			cout << "\tEnergy/part. of box \"" << box[i].name << "\" after minimization (";
-			cout << box[i].nParts*initMoves << " moves): ";
-			cout << box[i].energy/box[i].nParts << " K" << endl;
+			if (set == 0){
+				cout << "Minimizing initial configuration of box \"" << box[i].name << "\"..."<< endl;
+				BoxEnergy(i);
+				cout << "\tEnergy/part. of box \"" << box[i].name << "\" before minimization: ";
+				cout << box[i].energy/box[i].nParts << " K" << endl;
+				for (int j=0; j<initMoves; j++){
+					for (int l=0; l<box[i].nParts; l++) MoveParticle();
+					//AdjustMCMoves();
+				}
+				BoxEnergy(i);
+				cout << "\tEnergy/part. of box \"" << box[i].name << "\" after minimization (";
+				cout << box[i].nParts*initMoves << " moves): ";
+				cout << box[i].energy/box[i].nParts << " K" << endl;
+			}else BoxEnergy(i);
 		}
 	}
 }
