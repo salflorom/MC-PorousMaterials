@@ -165,28 +165,27 @@ void MC::PrintTrajectory(int set){
 	ostringstream outDirName, outFileName;
 	double tmp=0.0;
 
-	if (sim.printTrajectory){
-		outDirName << "./" << sim.projName;
-		for (int i=0; i<thermoSys.nBoxes; i++){
-			outFileName << outDirName.str() << "/" << box[i].name << "/trajectory.exyz";
-			if (set == 0) trajFile.open(outFileName.str());
-			else trajFile.open(outFileName.str(), ios::app);
-			trajFile << box[i].nParts << "\n";
-			trajFile << "Lattice=\" " << box[i].width[0] << " " << tmp << " " << tmp << " ";
-			trajFile << tmp << " " << box[i].width[1] << " " << tmp << " ";
-			trajFile << tmp << " " << tmp << " " << box[i].width[2] << "\" ";
-			trajFile << "Properties=species:S:1:pos:R:3 Set=" << 1.*set << "\n";
-			for (int j=0; j<thermoSys.nSpecies; j++){
-				for (int k=1; k<=box[i].fluid[j].nParts; k++){
-					part = box[i].fluid[j].particle[k];
-					trajFile << fluid[j].name << "\t";
-					trajFile << part.x << "\t" << part.y << "\t" << part.z << "\n"; //AA
-				}
+	outDirName << "./" << sim.projName;
+	for (int i=0; i<thermoSys.nBoxes; i++){
+		outFileName << outDirName.str() << "/" << box[i].name << "/trajectory.exyz";
+		if (set == 0 || !sim.printTrajectory) trajFile.open(outFileName.str());
+		else trajFile.open(outFileName.str(), ios::app);
+		trajFile << box[i].nParts << "\n";
+		trajFile << "Lattice=\" " << box[i].width[0] << " " << tmp << " " << tmp << " ";
+		trajFile << tmp << " " << box[i].width[1] << " " << tmp << " ";
+		trajFile << tmp << " " << tmp << " " << box[i].width[2] << "\" ";
+		trajFile << "Properties=species:S:1:pos:R:3 "
+				<< "Set: " << 1.*set << " Disp: " << sim.dr[i] <<  " VolDisp: " << sim.dv[i] << "\n";
+		for (int j=0; j<thermoSys.nSpecies; j++){
+			for (int k=1; k<=box[i].fluid[j].nParts; k++){
+				part = box[i].fluid[j].particle[k];
+				trajFile << fluid[j].name << "\t";
+				trajFile << part.x << "\t" << part.y << "\t" << part.z << "\n"; //AA
 			}
-			trajFile.close();
-			outFileName.str(""); outFileName.clear();
-			trajFile.clear();
 		}
+		trajFile.close();
+		outFileName.str(""); outFileName.clear();
+		trajFile.clear();
 	}
 }
 void MC::PrintLog(int set){

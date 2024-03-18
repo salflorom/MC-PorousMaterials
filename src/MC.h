@@ -39,7 +39,7 @@ class MC {
 			double binWidth, barC[MAXBOX][MAXSPECIES], widomInsert[MAXBOX][MAXSPECIES], widomDelete[MAXBOX][MAXSPECIES], rdf[NBINS+1];
 		} stats;
 		struct Simulation{
-			bool printTrajectory, restart;
+			bool printTrajectory, continueAfterCrash;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
 			double dr[MAXBOX], dv[MAXBOX];
 			int nDispAttempts, nSwapAttempts, nVolAttempts;
@@ -48,7 +48,7 @@ class MC {
 		} sim;
 		struct Particle{
 			double x, y, z;
-			double energy, manyBodyE, pairPotE, boxE; // //Particle energy.
+			double energy, manyBodyE, pairPotE, boxE; // Particle energy.
 			bool operator!=(Particle bPart){
 				if ((this->x != bPart.x) || (this->y != bPart.y) || (this->z != bPart.z)){
 					return true;
@@ -88,7 +88,7 @@ class MC {
 		void PrintParams(void);
 		void InsertParticle(int, int, int);
 		void InitialConfig(void);
-		void MinimizeEnergy(void);
+		void MinimizeEnergy(long int);
 		void AdjustMCMoves(int);
 		void MoveParticle(void);
 		void ChangeVolume(void);
@@ -107,7 +107,8 @@ class MC {
 		void BoxEnergy(int);
 		void CorrectEnergy(void);
 
-		long int Restart(void);
+		void ReadTrajectory(void);
+		long int ReadLogFile(void);
 		int* GetMCMoves(void);
 		int GetNSets(void){return int(sim.nSets);}
 		int GetNEquilSets(void){return int(sim.nEquilSets);}
@@ -115,8 +116,8 @@ class MC {
 		int GetPrintEvery(void){return int(sim.printEvery);}
 
 		double Random(void){return dis(engine);} //random num. in the interval [0,1).
-		double BarWeight(double, double);	
-    double ComputeVolume(Box);
+		double BarWeight(double, double);
+		double ComputeVolume(Box);
 		double ComputeBoxWidth(Box, double);
 
 		double NeighDistance(int, Particle, Particle);
