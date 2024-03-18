@@ -9,7 +9,7 @@
 //
 
 #include <cstring> // strlen
-#include <cmath> // pi, exp, round
+#include <cmath> // pi, exp, round, tgammal
 #include <climits> // INT_MAX
 
 #include "NumRecipes/hypgeo.h" // hypgeo

@@ -53,9 +53,12 @@ void MC::InsertParticle(int ithBox, int ithSpecies, int index){
 	}
 }
 void MC::InitialConfig(void){
-	for (int i=0; i<thermoSys.nBoxes; i++){
-		for (int j=0; j<thermoSys.nSpecies; j++){
-			for (int k=1; k<=box[i].fluid[j].nParts; k++) InsertParticle(i, j, k);
+	if (sim.continueAfterCrash) ReadTrajectory();
+	else{
+		for (int i=0; i<thermoSys.nBoxes; i++){
+			for (int j=0; j<thermoSys.nSpecies; j++){
+				for (int k=1; k<=box[i].fluid[j].nParts; k++) InsertParticle(i, j, k);
+			}
 		}
 	}
 	cout << "Initial configuration set." << endl;
@@ -410,6 +413,7 @@ void MC::ComputeWidom(void){
 	double energy=0.;
 
 	if (thermoSys.nBoxes == 1 && sim.nSwapAttempts == 0){ // For single box simulations and no GCMC.
+		ithSpecies = int(Random()*thermoSys.nSpecies);
 		if (Random() < 0.5){ // Insert ghost particle (Widom insertion).
 			stats.widomInsertions[0][ithSpecies]++;
 			ithPart = MAXPART-1;
@@ -421,7 +425,6 @@ void MC::ComputeWidom(void){
 			}else stats.widomInsert[0][ithSpecies] += BarWeight(stats.barC[0][ithSpecies],energy)*exp(-0.5*energy/thermoSys.temp); // NVT ensemble.
 		}else{ // Virtually delete real particle (Widom deletion).
 			stats.widomDeletions[0][ithSpecies]++;
-			ithSpecies = int(Random()*thermoSys.nSpecies);
 			ithPart = int(Random()*box[0].fluid[ithSpecies].nParts); // Select particle randomly.
 			EnergyOfParticle(0, ithSpecies, ithPart);
 			energy = box[0].fluid[ithSpecies].particle[ithPart].energy;

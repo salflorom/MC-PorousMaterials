@@ -26,7 +26,7 @@ int main(int argc, char** argv){
 
 	start = chrono::system_clock::now();
 	time_t startTime = chrono::system_clock::to_time_t(start);
-	cout << "Starting simulation at " << ctime(&startTime) << endl;
+	cout << "Starting simulation on " << ctime(&startTime) << endl;
 
 	inFileName = argv[1];
 	currentSet = mc.ReadInputFile(inFileName);
@@ -41,10 +41,12 @@ int main(int argc, char** argv){
 	nDispAttempts = moves[0];
 	nVolAttempts = moves[1];
 	nSwapAttempts = moves[2];
+
 	if (currentSet == 0) mc.PrintTrajectory(0);
 
+	cout << "Starting minimization..." << endl;
 	startMinimization = chrono::system_clock::now();
-	mc.MinimizeEnergy();
+	mc.MinimizeEnergy(currentSet);
 	endMinimization = chrono::system_clock::now();
 	elapsedMinimization = endMinimization-startMinimization;
 	cout << "Minimization finished" << endl;
