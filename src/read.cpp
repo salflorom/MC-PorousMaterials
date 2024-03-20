@@ -267,6 +267,9 @@ void MC::ReadTrajectory(void){
 		}else{
 			cout << "\tWarning: Last configuration not found." << endl;
 			cout << "\t\tConfiguration will be created by assigning random positions." << endl;
+			sim.continueAfterCrash = false;
+			InitialConfig();
+			sim.continueAfterCrash = true;
 		}
 		cout << "\tFinished reading configuration." << endl;
 		simFileName.str(string());
