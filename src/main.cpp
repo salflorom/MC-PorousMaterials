@@ -9,16 +9,17 @@
 #include <iostream> // cout
 #include <chrono> // chrono
 #include <ctime> // time_t, ctime
+#include "Eigen/Dense"
 
 #include "MC.h"
 
 int main(int argc, char** argv){
 	string inFileName;
-	int nSets, nEquilSets, nStepsPerSet, printEvery;
+	size_t nSets, nEquilSets, nStepsPerSet, printEvery;
 	int nDispAttempts, nVolAttempts, nSwapAttempts;
-	int* moves;
-	long int currentSet;
+	size_t currentSet;
 	double rand;
+	Eigen::Vector3i moves;
 	chrono::time_point<chrono::system_clock> startMinimization, endMinimization;
 	chrono::time_point<chrono::system_clock> start, startSimulation, endSimulation;
 	chrono::duration<double> elapsedMinimization, elapsedSimulation;
@@ -38,9 +39,9 @@ int main(int argc, char** argv){
 	nStepsPerSet = mc.GetNStepsPerSet();
 	printEvery = mc.GetPrintEvery();
 	moves = mc.GetMCMoves();
-	nDispAttempts = moves[0];
-	nVolAttempts = moves[1];
-	nSwapAttempts = moves[2];
+	nDispAttempts = moves(0);
+	nVolAttempts = moves(1);
+	nSwapAttempts = moves(2);
 
 	if (currentSet == 0) mc.PrintTrajectory(0);
 
@@ -59,10 +60,10 @@ int main(int argc, char** argv){
 	}
 
 	startSimulation = chrono::system_clock::now();
-	for (int set=currentSet+1; set<=nSets; set++){
+	for (size_t set=currentSet+1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
-		for (int step=1; step<=nStepsPerSet; step++){
+		for (size_t step=1; step<=nStepsPerSet; step++){
 			rand = mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts);
 			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.
 			else if (rand <= nDispAttempts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
