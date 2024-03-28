@@ -6,11 +6,12 @@
 #include <string> // string
 #include <cmath> //M_PI
 #include <random> // random_device, mt19937_64, uniform_real_distribution
+#include "Eigen/Dense"
 
 #define NBINS 100
-#define MAXPART 9999 //Max. num. of particles. 0th part. is to save old config.
-#define MAXSPECIES 2 //Max. num. of species.
-#define MAXBOX 2 //Max. num. of boxes. 0th box is to save old comfiguration.
+#define MAXPART 1000000 //Max. num. of particles. 0th part. is to save old config.
+#define MAXSPECIES 10 //Max. num. of species.
+#define MAXBOX 10 //Max. num. of boxes. 0th box is to save old comfiguration.
 #define pi M_PI
 #define kb  1.380649e-23 // J/K
 #define na 6.02214076e23 // mol^-1
@@ -32,23 +33,26 @@ class MC {
 		uniform_real_distribution<double> dis{0.0,0.9999};
 
 		struct Stats{
-			int acceptance[MAXBOX], rejection[MAXBOX], nDisplacements[MAXBOX];
-			int acceptanceVol[MAXBOX], rejectionVol[MAXBOX], nVolChanges;
+			Eigen::Matrix<int,MAXBOX,1> acceptance, rejection, nDisplacements;
+			Eigen::Matrix<int,MAXBOX,1> acceptanceVol, rejectionVol;
+			int nVolChanges;
 			int acceptSwap, rejectSwap, nSwaps;
-			int widomInsertions[MAXBOX];
-			double binWidth, widom[MAXBOX][MAXSPECIES], rdf[NBINS+1];
+			Eigen::Matrix<int,MAXBOX,MAXSPECIES> widomInsertions, widomDeletions;
+			Eigen::Matrix<double,MAXBOX,MAXSPECIES> barC, widomInsert, widomDelete;
+			Eigen::Matrix<double,Eigen::Dynamic,1> rdf = Eigen::Matrix<double,Eigen::Dynamic,1>(NBINS+1);
+			double binWidth;
 		} stats;
 		struct Simulation{
-			bool printTrajectory;
+			bool printTrajectory, continueAfterCrash;
 			double nSets, nEquilSets, nStepsPerSet, printEvery;
-			double dr[MAXBOX], dv[MAXBOX];
-			int nDispAttempts, nSwapAttempts, nVolAttempts;
-			int cycle, rdf[2];
+			Eigen::Matrix<double,MAXBOX,1> dr, dv;
+			Eigen::Vector2i rdf;
+			int nDispAttempts, nSwapAttempts, nVolAttempts, cycle;
 			string projName;
 		} sim;
 		struct Particle{
 			double x, y, z;
-			double energy, manyBodyE, pairPotE, boxE; // //Particle energy.
+			double energy, manyBodyE, pairPotE, boxE; // Particle energy.
 			bool operator!=(Particle bPart){
 				if ((this->x != bPart.x) || (this->y != bPart.y) || (this->z != bPart.z)){
 					return true;
@@ -57,23 +61,24 @@ class MC {
 		};
 		struct Fluid{
 			string name;
-			string vdwPot[MAXSPECIES];
+			Eigen::Matrix<string,MAXSPECIES,1> vdwPot;
 			int nParts;
 			double molarMass, mu, muEx;
-			double sigma[MAXSPECIES], epsilon[MAXSPECIES], rcut[MAXSPECIES];
-			//Energy of the ith species in the jth box (ignoring interactions with the box).
-			Particle particle[MAXPART];
-		} fluid[MAXSPECIES]; //For single species properties.
+			Eigen::Matrix<double,MAXSPECIES,1> sigma, epsilon, rcut;
+			Eigen::Matrix<Particle,Eigen::Dynamic,1> particle = Eigen::Matrix<Particle,Eigen::Dynamic,1>(MAXPART);
+		};
+		Eigen::Matrix<Fluid,Eigen::Dynamic,1> fluid = Eigen::Matrix<Fluid,Eigen::Dynamic,1>(MAXSPECIES); //For single species properties.
 		struct Box{
 			string name, geometry, vdwPot; //pot: solid-fluid potential.
-			int nParts;
-			bool fix, PBC[3];
-			double width[3];
+			int nParts, fix;
+			Eigen::Vector3i PBC;
+			Eigen::Vector3d width;
 			double oldEnergy, solidDens, volume, deltaLayers, maxRcut;
 			double energy, manyBodyE, pairPotE, boxE; // Energy of the box.
 			int nLayersPerWall;
-			Fluid fluid[MAXSPECIES]; //For solid-species properties.
-		} box[MAXBOX];
+			Eigen::Matrix<Fluid,Eigen::Dynamic,1> fluid = Eigen::Matrix<Fluid,Eigen::Dynamic,1>(MAXSPECIES); //For single species properties.
+		};
+		Eigen::Matrix<Box,Eigen::Dynamic,1> box = Eigen::Matrix<Box,Eigen::Dynamic,1>(MAXBOX); //For single species properties.
 		struct ThermodynamicSystem{
 			double temp, volume, press;
 			int nBoxes, nSpecies, nParts;
@@ -83,73 +88,78 @@ class MC {
 /* **************************************************************************** */
 		MC(void);
 		void OutputDirectory(void);
-		void ReadInputFile(string);
+		size_t ReadInputFile(string);
 		void ResetStats(void);
 		void PrintParams(void);
 		void InsertParticle(int, int, int);
 		void InitialConfig(void);
-		void MinimizeEnergy(void);
-		void AdjustMCMoves(int);
+		void MinimizeEnergy(size_t);
+		void AdjustMCMoves(size_t);
 		void MoveParticle(void);
 		void ChangeVolume(void);
-		void RescaleCenterOfMass(Box, Box&, int);
+		void RescaleCenterOfMass(Box&, Box&, int);
 		void SwapParticle(void);
 		void PBC(int, Particle&);
 		void ComputeRDF(void);
 		void PrintRDF(void);
 		void Metropolis(int);
-		void PrintTrajectory(int);
-		void PrintLog(int);
-		void PrintStats(int);
+		void PrintTrajectory(size_t);
+		void PrintLog(size_t);
+		void PrintStats(size_t);
 		void ComputeWidom(void);
 		void ComputeChemicalPotential(void);
 		void EnergyOfParticle(int, int, int);
-		double Random(void){return dis(engine);} //random num. in the interval [0,1).
-		double ComputeVolume(Box);
-		double ComputeBoxWidth(Box, double);
 		void BoxEnergy(int);
 		void CorrectEnergy(void);
 
-		int* GetMCMoves(void);
-		int GetNSets(void){return int(sim.nSets);}
-		int GetNEquilSets(void){return int(sim.nEquilSets);}
-		int GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
-		int GetPrintEvery(void){return int(sim.printEvery);}
+		void ReadTrajectory(void);
+		size_t ReadLogFile(void);
+		size_t GetNSets(void){return int(sim.nSets);}
+		size_t GetNEquilSets(void){return int(sim.nEquilSets);}
+		size_t GetNStepsPerSet(void){return int(sim.nStepsPerSet);}
+		size_t GetPrintEvery(void){return int(sim.printEvery);}
+		Eigen::Vector3i GetMCMoves(void);
+
+		double Random(void){return dis(engine);} //random num. in the interval [0,1).
+		double BarWeight(double, double);
+		double ComputeVolume(Box&);
+		double ComputeBoxWidth(Box&, double);
 
 		double NeighDistance(int, Particle, Particle);
-		double StepUnit(double, double, double);
-		// Fluid-Fluid potentials //
+		// >>> Fluid-Fluid potentials >>> //
+		// Hard sphere potential
 		double HardSphere_Pot(int, int, int, int);
-		// Lennard-Jones 12-6 potential //
+		// Lennard-Jones 12-6 potential
 		double LJ126_Pot(int, int, int, int);
-		// EAM Na potential //
-		double* EAMNa_Pot(int, int, int, int);
+		// EAM Na potential
+		Eigen::Vector2d EAMNa_Pot(int, int, int, int);
 		double EAMNa_EmbPot(double);
 		double EAMNa_eDens(double);
 		double EAMNa_PairPot(double);
-		// EAM K potential //
-		double* EAMK_Pot(int, int, int, int);
+		// EAM K potential
+		Eigen::Vector2d EAMK_Pot(int, int, int, int);
 		double EAMK_EmbPot(double);
 		double EAMK_eDens(double);
 		double EAMK_PairPot(double);
-		// EAM Rb potential //
-		double* EAMRb_Pot(int, int, int, int);
+		// EAM Rb potential
+		Eigen::Vector2d EAMRb_Pot(int, int, int, int);
 		double EAMRb_EmbPot(double);
 		double EAMRb_eDens(double);
 		double EAMRb_PairPot(double);
-		// EAM Ga potential //
-		double* EAMGa_Pot(int, int, int, int);
+		// EAM Ga potential
+		Eigen::Vector2d EAMGa_Pot(int, int, int, int);
+		double StepUnit(double, double, double);
 		double EAMGa_EmbPot(double);
 		double EAMGa_eDens(double);
 		double EAMGa_PairPot(double);
-		// Fluid-Fluid potentials //
+		// <<< Fluid-Fluid potentials <<< //
 
-		// Solid-Fluid potentials //
+		// >>> Solid-Fluid potentials >>> //
 		double SlitLJ_Pot(int, int, int);
 		double CylindricalLJ10_4(int, int, int);
 		double CylindricalSteele10_4_3(int, int, int);
 		double SphericalLJ_Pot(int, int, int);
-		// Solid-Fluid potentials //
+		// <<< Solid-Fluid potentials >>> //
 /* **************************************************************************** */
 };
 /* **************************************************************************** */

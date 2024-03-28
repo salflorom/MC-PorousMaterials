@@ -9,16 +9,17 @@
 #include <iostream> // cout
 #include <chrono> // chrono
 #include <ctime> // time_t, ctime
+#include "Eigen/Dense"
 
 #include "MC.h"
 
 int main(int argc, char** argv){
 	string inFileName;
-	int nSets, nEquilSets, nStepsPerSet, printEvery;
+	size_t nSets, nEquilSets, nStepsPerSet, printEvery;
 	int nDispAttempts, nVolAttempts, nSwapAttempts;
-	int numThreads;
-	int* moves;
+	size_t currentSet;
 	double rand;
+	Eigen::Vector3i moves;
 	chrono::time_point<chrono::system_clock> startMinimization, endMinimization;
 	chrono::time_point<chrono::system_clock> start, startSimulation, endSimulation;
 	chrono::duration<double> elapsedMinimization, elapsedSimulation;
@@ -26,10 +27,10 @@ int main(int argc, char** argv){
 
 	start = chrono::system_clock::now();
 	time_t startTime = chrono::system_clock::to_time_t(start);
-	cout << "Starting simulation at " << ctime(&startTime) << endl;
+	cout << "Starting simulation on " << ctime(&startTime) << endl;
 
 	inFileName = argv[1];
-	mc.ReadInputFile(inFileName);
+	currentSet = mc.ReadInputFile(inFileName);
 	mc.PrintParams();
 	mc.OutputDirectory();
 	mc.InitialConfig();
@@ -38,27 +39,31 @@ int main(int argc, char** argv){
 	nStepsPerSet = mc.GetNStepsPerSet();
 	printEvery = mc.GetPrintEvery();
 	moves = mc.GetMCMoves();
-	nDispAttempts = moves[0];
-	nVolAttempts = moves[1];
-	nSwapAttempts = moves[2];
-	mc.PrintTrajectory(0);
+	nDispAttempts = moves(0);
+	nVolAttempts = moves(1);
+	nSwapAttempts = moves(2);
 
+	if (currentSet == 0) mc.PrintTrajectory(0);
+
+	cout << "Starting minimization..." << endl;
 	startMinimization = chrono::system_clock::now();
-	mc.MinimizeEnergy();
+	mc.MinimizeEnergy(currentSet);
 	endMinimization = chrono::system_clock::now();
 	elapsedMinimization = endMinimization-startMinimization;
 	cout << "Minimization finished" << endl;
 	cout << "Elapsed time of minimization: " << elapsedMinimization.count() << " s" << endl;
 	cout << endl;
 
-	mc.PrintTrajectory(1);
-	mc.PrintLog(0);
+	if (currentSet == 0){
+		mc.PrintTrajectory(0);
+		mc.PrintLog(0);
+	}
 
 	startSimulation = chrono::system_clock::now();
-	for (int set=1; set<=nSets; set++){
+	for (size_t set=currentSet+1; set<=nSets; set++){
 		//Reinitialize MC and Widom statistics every set.
 		mc.ResetStats();
-		{for (int step=1; step<=nStepsPerSet; step++){
+		for (size_t step=1; step<=nStepsPerSet; step++){
 			rand = mc.Random() * (nDispAttempts+nVolAttempts+nSwapAttempts);
 			if (rand <= nDispAttempts) mc.MoveParticle(); //Try displacement.
 			else if (rand <= nDispAttempts + nVolAttempts) mc.ChangeVolume(); //Try volume change.
@@ -69,14 +74,13 @@ int main(int argc, char** argv){
 				mc.ComputeRDF();
 			}
 		}
-		if (set%printEvery == 0) mc.PrintStats(set);
-		if ((set%printEvery == 0) && (set > nEquilSets)){
+		if (set%printEvery == 0){
 			mc.ComputeChemicalPotential();
+			mc.PrintStats(set);
 			mc.PrintTrajectory(set);
 			mc.PrintLog(set);
 		}
 		mc.AdjustMCMoves(set);
-		}
 	}
 	endSimulation = chrono::system_clock::now();
 	elapsedSimulation = endSimulation-startSimulation;
